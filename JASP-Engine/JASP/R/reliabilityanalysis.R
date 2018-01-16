@@ -15,49 +15,19 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-ReliabilityAnalysis <- function(dataset = NULL, options, perform = "run",
+ReliabilityAnalysis <- function(dataset, options, perform = "run",
 								callback = function(...) 0, state = NULL, ...) {
 
 	variables <- unlist(options$variables)
 
-	if (is.null(dataset)) {
-
-		if (perform == "run") {
-
-			dataset <- .readDataSetToEnd(columns.as.numeric=variables, columns.as.factor=NULL, exclude.na.listwise=NULL)
-
-		} else {
-
-			dataset <- .readDataSetHeader(columns.as.numeric=variables, columns.as.factor=NULL)
-
-		}
-
-	} else {
-
-		dataset <- .vdf(dataset, columns.as.numeric=variables, columns.as.factor=NULL)
-
-	}
-
 	## Retrieve State
 	# future idea: add correlation matrix to state and make all scale statistics modular.
-	defaults = c("variables", "reverseScaledItems", "missingValues")
-	stateKey <- list(
-		resultsAlpha = defaults,
-		confAlpha = c(defaults, "confAlphaLevel")
-	)
 	resultsAlpha <- state[["resultsAlpha"]]
 	resultsAlpha[["ciAlpha"]] <- state[["confAlpha"]]
 
 	# Store results
 
 	results <- list()
-
-	results[["title"]] <- "Reliability Analysis"
-
-	meta <- list(list(name="reliabilityScale", type="table"),
-				 list(name="reliabilityItemsObj", type="object", meta=list(list(name="reliabilityItems", type="table"))))
-
-	results[[".meta"]] <- meta
 
 	errorList <- NULL
 	
@@ -81,17 +51,17 @@ ReliabilityAnalysis <- function(dataset = NULL, options, perform = "run",
 	results[["reliabilityScale"]] <- .reliabalityScaleTable(resultsAlpha, dataset, options, variables, perform)
 
 	if (options$alphaItem || options$gutmannItem || options$itemRestCor || options$meanItem || options$sdItem || options[["mcDonaldItem"]]) {
-		results[["reliabilityItemsObj"]] <- list(title="Item Statistics", reliabilityItems=.reliabalityItemsTable(resultsAlpha, options, variables, perform))
+		results[["reliabilityItemsObj"]] <- .reliabalityItemsTable(resultsAlpha, options, variables, perform)
 	} else {
 		results[["reliabilityItemsObj"]] <- NULL
 	}
 
 	# Save state
-
-	state[["options"]] <- options
-	state[["resultsAlpha"]] <- resultsAlpha
-	state[["confAlpha"]] <- resultsAlpha[["ciAlpha"]]
-	attr(state, "key") <- stateKey
+	state <- list(
+	  options = options,
+	  resultsAlpha = resultsAlpha,
+	  confAlpha = resultsAlpha[["ciAlpha"]]
+	)
 
 	if (perform == "init") {
 
@@ -162,6 +132,11 @@ ReliabilityAnalysis <- function(dataset = NULL, options, perform = "run",
 												flip = FALSE, plot = FALSE)[["omega.tot"]]
 			}
 		}
+		else {
+		  for (i in 1:nVar) {
+		    omegaDropped[i] <- "."
+		  }
+		}
 
 		relyFit[["omega"]] <- omega
 		relyFit[["omegaDropped"]] <- omegaDropped
@@ -174,42 +149,7 @@ ReliabilityAnalysis <- function(dataset = NULL, options, perform = "run",
 
 .reliabalityScaleTable <- function (r, dataset, options, variables, perform) {
 
-	table <- list()
-
-	table[["title"]] <- "Scale Reliability Statistics"
-
-	fields = list(list(name="case", title="", type="string"))
-
-	if (options$meanScale)
-		fields[[length(fields) + 1]] <- list(name="mu", title="mean", type="number", format="sf:4;dp:3")
-
-	if (options$sdScale)
-		fields[[length(fields) + 1]] <- list(name="sd", title="sd", type="number", format="sf:4;dp:3")
-
-	if (options$alphaScale)
-		fields[[length(fields) + 1]] <- list(name="alpha", title="Cronbach's \u03B1", type="number", format="sf:4;dp:3")
-
-	if (options$gutmannScale)
-		fields[[length(fields) + 1]] <- list(name="lambda", title="Gutmann's \u03BB6", type="number", format="sf:4;dp:3")
-
-	if (options[["mcDonaldScale"]])
-		fields[[length(fields) + 1]] <- list(name="omega", title="McDonald's \u03C9", type="number", format="sf:4;dp:3")
-
-	if (options[["glbScale"]])
-		fields[[length(fields) + 1]] <- list(name="glb", title="Greatest lower bound", type="number", format="sf:4;dp:3")
-
-	if (options[["averageInterItemCor"]])
-		fields[[length(fields) + 1]] <- list(name="rho", title="Average interitem correlation", type="number", format="sf:4;dp:3")
-
-	if (options[["confAlpha"]]) {
-		overTitle <- sprintf("%.1f%% Confidence Interval", 100*options[["confAlphaLevel"]])
-		fields[[length(fields) + 1]] <- list(name="lower", title="Lower", type="number", format="sf:4;dp:3", overTitle = overTitle)
-		fields[[length(fields) + 1]] <- list(name="upper", title="Upper", type="number", format="sf:4;dp:3", overTitle = overTitle)
-	}
-
-	table[["schema"]] <- list(fields = fields)
-
-	data <- list()
+  table <- jasp.data.frame(colnames=c("scale", "mean", "sd", "alpha", "lambda", "omega", "glb", "aic", "lowerCI", "upperCI"))
 
 	if (!is.null(r)) {
 
@@ -248,62 +188,47 @@ ReliabilityAnalysis <- function(dataset = NULL, options, perform = "run",
 		}
 
 		.addFootnote(footnotes, symbol = "<em>Note.</em>", text = message)
+		attr(table, "jasp.footnotes") <- footnotes
 
-		table[["footnotes"]] <- as.list(footnotes)
-
-
-		alpha <- NULL
-		lambda <- NULL
-		mu <- NULL
-		sd <- NULL
-		rho <- NULL
-		omega <- NULL
-		glb <- NULL
-		lower <- NULL
-		upper <- NULL
-
-		if (options$alphaScale)
-			alpha <- .clean(r$total$raw_alpha)
-
-		if (options$gutmannScale)
-			lambda <- .clean(r$total[["G6(smc)"]])
-
-		if (options$meanScale)
-			mu <- .clean(r$total$mean)
-
-		if (options$sdScale)
-			sd <- .clean(r$total$sd)
-
-		if (options[["averageInterItemCor"]])
-			rho <- .clean(r[["total"]][["average_r"]])
-
-		if (options[["mcDonaldScale"]])
-			omega <- .clean(r[["omega"]])
-
-		if (options[["glbScale"]]) {
-			if (r[["glb"]] == "." || isTryError(r[["glb"]])) { # unusable information
-				glb <- "."
-			} else { # a useable value
-				glb <- .clean(r[["glb"]])
-			}
-		}
-
-		if (options[["confAlpha"]]) {
-			lower = .clean(r[["ciAlpha"]][1])
-			upper = .clean(r[["ciAlpha"]][2])
-		}
-
-		data[[1]] <- list(case="scale", alpha=alpha, lambda=lambda, omega = omega, glb = glb, rho=rho, mu=mu, sd=sd, lower = lower, upper = upper)
-
-		table[["status"]] <- "complete"
+		table <- rbind(table, c(scale = "scale", mean = r[["total"]][["mean"]], sd = r[["total"]][["sd"]], alpha = r[["total"]][["raw_alpha"]], lambda = r[["total"]][["G6(smc)"]], omega = r[["omega"]], glb = r[["glb"]], aic = r[["total"]][["average_r"]], lowerCI = r[["ciAlpha"]][[1]], upperCI = r[["ciAlpha"]][[2]]))
 
 	} else {
 
-		data[[1]] <- list(case="scale", alpha=".", lambda=".", omega = ".", glb = ".", rho =".", mean=".", sd=".", lower = ".", upper = ".")
+	  table <- rbind(table, c(scale = "scale", mean = ".", sd = ".", alpha = ".", lambda = ".", omega = ".", glb = ".", aic = ".", lowerCI = ".", upperCI = "."))
 
 	}
 
-	table[["data"]] <- data
+  if (options$confAlpha) {
+    schema <- list(
+      list(name="lowerCI", overTitle=paste0(options$confAlphaLevel * 100, "% Confidence Interval")),
+      list(name="upperCI", overTitle=paste0(options$confAlphaLevel * 100, "% Confidence Interval"))
+    )
+    attr(table, "jasp.schema") <- schema
+  }
+  
+  if (! options$alphaScale)
+    table <- subset(table, select=-alpha)
+  
+  if (! options$gutmannScale)
+    table <- subset(table, select=-lambda)
+  
+  if (! options$mcDonaldScale)
+    table <- subset(table, select=-omega)
+  
+  if (! options$glbScale)
+    table <- subset(table, select=-glb)
+  
+  if (! options$averageInterItemCor)
+    table <- subset(table, select=-aic)
+  
+  if (! options$meanScale)
+    table <- subset(table, select=-mean)
+  
+  if (! options$sdScale)
+    table <- subset(table, select=-sd)
+  
+  if (! options$confAlpha)
+    table <- subset(table, select=-c(lowerCI, upperCI))
 
 	return(table)
 
@@ -311,41 +236,14 @@ ReliabilityAnalysis <- function(dataset = NULL, options, perform = "run",
 
 .reliabalityItemsTable <- function (r, options, variables, perform) {
 
-	table <- list()
-
-	table[["title"]] <- "Item Reliability Statistics"
-
-	overTitle <- paste0("If item dropped")
-
-	fields = list(list(name="case", title="", type="string", combine=TRUE))
-
-	if (options$meanItem)
-		fields[[length(fields) + 1]] <- list(name="mu", title="mean", type="number", format="sf:4;dp:3")
-
-	if (options$sdItem)
-		fields[[length(fields) + 1]] <- list(name="sd", title="sd", type="number", format="sf:4;dp:3")
-
-	if (options$itemRestCor)
-		fields[[length(fields) + 1]] <- list(name="itemRestCor", title="item-rest correlation", type="number", format="sf:4;dp:3")
-
-	if (options$alphaItem)
-		fields[[length(fields) + 1]] <- list(name="alpha", title="Cronbach's \u03B1", type="number", format="sf:4;dp:3", overTitle = overTitle)
-
-	if (options$gutmannItem)
-		fields[[length(fields) + 1]] <- list(name="lambda", title="Gutmann's \u03BB6", type="number", format="sf:4;dp:3", overTitle = overTitle)
-
-	if (options[["mcDonaldItem"]])
-		fields[[length(fields) + 1]] <- list(name="omega", title="McDonald's \u03C9", type="number", format="sf:4;dp:3", overTitle = overTitle)
-
-	table[["schema"]] <- list(fields = fields)
-
-	data <- list()
+  table <- jasp.data.frame(colnames=c("variable", "mean", "sd", "irc", "alpha", "lambda", "omega"))
 
 	footnotes <- .newFootnotes()
 
 	if (length(options$reverseScaledItems) > 0) {
 		message <- "reverse-scaled item"
 		.addFootnote(footnotes, symbol = "\u207B", text=message)
+		attr(table, "jasp.footnotes") <- footnotes
 	}
 
 	# can only be computed if there are at least 3 variables.
@@ -354,53 +252,25 @@ ReliabilityAnalysis <- function(dataset = NULL, options, perform = "run",
 		message <- "Warning: McDonald's \u03C9 if item dropped can only be calculated for three or more variables."
 		.addFootnote(footnotes, text = message)
 
+		attr(table, "jasp.footnotes") <- footnotes
 	}
 
-	# psych::alpha uses a minus to signify reverse scaled item. 
-	rowNames <- gsub("-","", rownames(r$alpha.drop))
 
 	if (!is.null(r)) {
 
 		for (var in variables) {
 
-			varV <- .v(var)
-			index <- which(varV == rowNames)
+		  index <- which(var == variables)
 
-			alpha <- NULL
-			lambda <- NULL
-			itemRestCor <- NULL
-			mu <- NULL
-			sd <- NULL
-			omega <- NULL
+		  if (var %in% options$reverseScaledItems) {
+		    case <- paste0(var,"\u207B")
+		  } else {
+		    case <- var
+		  }
 
-			if (var %in% options$reverseScaledItems) {
-				case <- paste0(var,"\u207B")
-			} else {
-				case <- var
-			}
+		  table <- rbind(table, c(variable = case, mean = r$item.stats[index,"mean"], sd = r$item.stats[index,"sd"], irc = r$item.stats[index,"r.drop"], alpha = r$alpha.drop[index,"raw_alpha"], lambda = r$alpha.drop[index, "G6(smc)"], omega = r[["omegaDropped"]][index]))
 
-			if (options$alphaItem)
-				alpha <- .clean(r$alpha.drop[index,"raw_alpha"])
-
-			if (options$gutmannItem)
-				lambda <- .clean(r$alpha.drop[index, "G6(smc)"])
-
-			if (options$itemRestCor)
-				itemRestCor <- .clean(r$item.stats[index,"r.drop"])
-
-			if (options$meanItem)
-				mu <- .clean(r$item.stats[index,"mean"])
-
-			if (options$sdItem)
-				sd <- .clean(r$item.stats[index,"sd"])
-
-			if (options[["mcDonaldItem"]])
-				omega <- .clean(r[["omegaDropped"]][index])
-
-			data[[length(data) + 1]] <- list(case=case, alpha=alpha, lambda=lambda, omega = omega, itemRestCor=itemRestCor, mu=mu, sd=sd)
 		}
-
-		table[["status"]] <- "complete"
 
 	} else {
 
@@ -411,14 +281,37 @@ ReliabilityAnalysis <- function(dataset = NULL, options, perform = "run",
 
 		for (var in variablesTemp) {
 
-			data[[length(data) + 1]] <- list(case=var, alpha=".", lambda=".", omega = ".", itemRestCor=".", mu=".", sd=".")
+		  table <- rbind(table, c(variable=var, mean = ".", sd = ".", irc = ".", alpha = ".", lambda = ".", omega = "."))
 
 		}
 	}
 
-	table[["data"]] <- data
-
-	table[["footnotes"]] <- as.list(footnotes)
+	if (options$alphaItem || options$gutmannItem || options$mcDonaldItem) {
+	  schema <- list(
+	    list(name="alpha", overTitle=paste0("If item dropped")),
+	    list(name="lambda", overTitle=paste0("If item dropped")),
+	    list(name="omega", overTitle=paste0("If item dropped"))
+	  )
+	  attr(table, "jasp.schema") <- schema
+	}
+	
+	if (! options$alphaItem)
+	  table <- subset(table, select=-alpha)
+	
+	if (! options$gutmannItem)
+	  table <- subset(table, select=-lambda)
+	
+	if (! options$mcDonaldItem)
+	  table <- subset(table, select=-omega)
+	
+	if (! options$itemRestCor)
+	  table <- subset(table, select=-irc)
+	
+	if (! options$meanItem)
+	  table <- subset(table, select=-mean)
+	
+	if (! options$sdItem)
+	  table <- subset(table, select=-sd)
 
 	return(table)
 

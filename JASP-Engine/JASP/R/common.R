@@ -235,7 +235,7 @@ checkPackages <- function() {
 	results <- list()
 	for (i in 1:length(resultsMeta)) {
 		item <- resultsMeta[[i]]
-		name <- names(resultsMeta)[i]
+    name <- item[["name"]]
 		type <- item[["type"]]
 		if (type == "table") {
 			table <- .makeEmptyTable(item[["columns"]])
@@ -283,7 +283,7 @@ checkPackages <- function() {
 	# Args:
 	# - results: list with (non-parsed) output elements from an analysis
 	# - title: the title of the analysis, taken from the analysis json file
-	# - resultsMeta: full (named) list taken from the analysis json file, 
+        # - resultsMeta: full list taken from the analysis json file,
 	#                contains all output descriptions of tables/plots/containers 
 	# - oldState: state file that was retrieved before the current analysis ran
 	#
@@ -305,8 +305,13 @@ checkPackages <- function() {
 
 	resultsMeta <- .simplifyResultsMeta(resultsMeta) # this basically flattens the nested table/images in containers
 
-	results$results <- .convertResults(results$results, resultsMeta, oldState) # make the results Qt ready
+	namesCheck <- list()
+	for (i in 1:length(results$results$.meta))		
+	  namesCheck[i] <- results$results$.meta[[i]]$name
 	
+	results$results <- .convertResults(results$results, resultsMeta, oldState, namesCheck = namesCheck) # make the results Qt ready
+  namesCheck <- NULL
+		
 	if (is.null(results$keep))
 		results$keep <- .getKeepImages(results$results)
 	
@@ -319,19 +324,21 @@ checkPackages <- function() {
 	#
 	# Args:
 	# - results: list with (parsed or non-parsed) output elements from an analysis
-	# - resultsMeta: full (named) list taken from the analysis json file, 
+        # - resultsMeta: full list taken from the analysis json file,
 	#                contains all output descriptions of tables/plots/containers 
 	#
 	# Return:
 	# - the description of the results ready to be returned by run as is
 	#
 	meta <- list()
-	for (itemName in names(resultsMeta)) {
+  for (i in 1:length(resultsMeta)) {
+    item <- resultsMeta[[i]]
+    itemName <- item[["name"]]
+    
 		if (! itemName %in% names(results))
 			next
-		item <- resultsMeta[[itemName]]
 		type <- item[["type"]]
-		if (type == "image" || type == "table") {
+    if (type == "image" || type == "table") {
 			meta[[length(meta)+1]] <- list(type=type, name=itemName)
 		} else if (type == "container") {
 			meta[[length(meta)+1]] <- .analysisMetaFromResults(result=results[itemName], objectName=itemName)
@@ -487,9 +494,10 @@ checkPackages <- function() {
 	#   and their contents are placed on the top level
 	#
 	items <- list()
-	for (itemName in names(resultsMeta)) {
-		item <- resultsMeta[[itemName]]
-		type <- item[["type"]]
+  for (i in 1:length(resultsMeta)) {
+    item <- resultsMeta[[i]]
+    itemName <- item[["name"]]
+  	type <- item[["type"]]
 		if (type == "container") {
 			container <- item[["items"]]
 			if (is.list(container) && is.null(names(container))) # it is an array of items
@@ -531,7 +539,7 @@ checkPackages <- function() {
 	return(keep)
 }
 
-.convertResults <- function(results, resultsMeta, oldState, name=NULL) {
+.convertResults <- function(results, resultsMeta, oldState, name=NULL, namesCheck) {
 	# Recursive function that iterates over results and calls functions to convert
 	# data.frames/matrices to row lists and ggplot2/recordedPlot objects to png's
 	#
@@ -548,7 +556,7 @@ checkPackages <- function() {
 	# Return:
 	# - results list with row lists for tables and png's for plots
 	#
-	for (i in 1:length(results)) {
+  for (i in 1:length(results)) {
 		result <- results[[i]]
 		
 		type <- .getTerminalType(result)
@@ -556,7 +564,7 @@ checkPackages <- function() {
 			next
 		
 		proposal <- names(results)[i]
-		if (is.character(proposal) && proposal %in% names(resultsMeta))
+		if (is.character(proposal) && proposal %in% namesCheck)
 			name <- proposal
 		
 		if (! is.null(type) && (type == "image" || type == "table")) {
@@ -566,7 +574,7 @@ checkPackages <- function() {
 				results[[i]] <- .convertPlot(result, resultsMeta, oldState, name)
 			}
 		} else { # go deeper
-			results[[i]] <- .convertResults(result, resultsMeta, oldState, name)
+			results[[i]] <- .convertResults(result, resultsMeta, oldState, name, namesCheck)
 		}
 		
 	}
@@ -587,10 +595,9 @@ checkPackages <- function() {
 	# Return:
 	# - list with the converted plot along with the title, width, height, etc.
 	#
-	if (! any(class(plotObj) %in% c("recordedplot", "ggplot", "function")))
-		return(plotObj)
-	
-	attr <- attributes(plotObj)
+  if (! any(class(plotObj) %in% c("recordedplot", "ggplot", "function")))
+    return(plotObj)
+  attr <- attributes(plotObj)
 	plotMeta <- .getItemMeta(resultsMeta, attr, name, type="image")
 	if (is.null(plotMeta))
 		stop("Could not find meta description for current plot")
@@ -710,11 +717,14 @@ checkPackages <- function() {
 	#   taken from the analysis json file
 	#
 	itemMeta <- NULL
-	if ("jasp.name" %in% names(attr)) { # found in attributes
-		itemMeta <- resultsMeta[[attr[["jasp.name"]]]]
-	} else if (! is.null(name)) { # found in results list names
-		itemMeta  <- resultsMeta[[name]]
-	}
+	
+	if ("jasp.name" %in% names(attr)) # found in attributes
+    name <- attr[["jasp.name"]]
+  for (i in 1:length(resultsMeta)) {
+    item <- resultsMeta[[i]]
+    if (item[["name"]] == name)
+      itemMeta <- item
+  }
 	if (! is.null(itemMeta) && itemMeta[["type"]] == type)
 		return(itemMeta)
 	return(NULL)

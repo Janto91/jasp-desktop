@@ -1,8 +1,13 @@
 {
-	"name": "ReliabilityAnalysis",
-	"autorun": true,
-	"version": "1.00",
-	"options": [
+    "version": "2.00",
+    "autorun": true,
+    "init": true,
+    "name": "ReliabilityAnalysis",
+    "title": "Reliability Analysis",
+    "dataset": {
+        "numeric": "variables"
+    },
+    "options": [
     {
       "name": "variables",
       "type": "Variables"
@@ -95,5 +100,127 @@
 			"min": 0.000,
 			"value": 0.950
     }
-	]
+    ],
+    "results": [
+        {
+            "name": "reliabilityScale",
+            "type": "table",
+            "title": "Scale Reliability Statistics",
+            "columns": [
+                {
+                    "name": "scale",
+                    "title": "",
+                    "type": "string",
+                    "combine": true
+                },
+                {
+                    "name": "mean",
+                    "title": "mean",
+                    "type": "number",
+                    "format": "sf:4;dp:3"
+                },
+                {
+                    "name": "sd",
+                    "title": "sd",
+                    "type": "number",
+                    "format": "sf:4;dp:3"
+                },
+                {
+                    "name": "alpha",
+                    "title": "Cronbach's alpha",
+                    "type": "number",
+                    "format": "sf:4;dp:3"
+                },
+                {
+                    "name": "lambda",
+                    "title": "Guttman's λ6",
+                    "type": "number",
+                    "format": "sf:4;dp:3"
+                },
+                {
+                    "name": "omega",
+                    "title": "McDonald's ω",
+                    "type": "number",
+                    "format": "sf:4;dp:3"
+                },
+                {
+                    "name": "glb",
+                    "title": "Greatest lower bound",
+                    "type": "number",
+                    "format": "sf:4;dp:3"
+                },
+                {
+                    "name": "aic",
+                    "title": "Average interitem correlation",
+                    "type": "number",
+                    "format": "sf:4;dp:3"
+                },
+                {
+                    "name": "lowerCI",
+                    "title": "Lower",
+                    "type": "number",
+                    "format": "sf:4;dp:3"
+                },
+                {
+                    "name": "upperCI",
+                    "title": "Upper",
+                    "type": "number",
+                    "format": "sf:4;dp:3"
+                }
+            ]
+        },
+        {
+            "name": "reliabilityItemsObj",
+            "type": "table",
+            "title": "Item Reliability Statistics",
+            "columns": [
+                {
+                    "name": "variable",
+                    "title": "",
+                    "type": "string",
+                    "combine": true
+                },
+                {
+                    "name": "mean",
+                    "title": "mean",
+                    "type": "number",
+                    "format": "sf:4;dp:3"
+                },
+                {
+                    "name": "sd",
+                    "title": "sd",
+                    "type": "number",
+                    "format": "sf:4;dp:3"
+                },
+                {
+                    "name": "irc",
+                    "title": "item-rest correlation",
+                    "type": "number",
+                    "format": "sf:4;dp:3"
+                },
+                {
+                    "name": "alpha",
+                    "title": "Cronbach's alpha",
+                    "type": "number",
+                    "format": "sf:4;dp:3"
+                },
+                {
+                    "name": "lambda",
+                    "title": "Guttman's λ6",
+                    "type": "number",
+                    "format": "sf:4;dp:3"
+                },
+                {
+                    "name": "omega",
+                    "title": "McDonald's ω",
+                    "type": "number",
+                    "format": "sf:4;dp:3"
+                }
+            ]
+        }
+    ],
+    "state": {
+        "resultsAlpha": ["variables", "reverseScaledItems", "missingValues"],
+        "confAlpha": ["variables", "reverseScaledItems", "missingValues", "confAlphaLevel"]
+    }
 }

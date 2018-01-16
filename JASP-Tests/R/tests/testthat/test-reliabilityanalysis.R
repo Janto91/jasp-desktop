@@ -17,10 +17,11 @@ test_that("Main table results match", {
   options$sdScale <- TRUE
   results <- jasptools::run("ReliabilityAnalysis", "test.csv", options, view=FALSE, quiet=TRUE)
   table <- results[["results"]][["reliabilityScale"]][["data"]]
+  table
   expect_equal_tables(table,
-    list("scale", -0.757822989578577, -0.0677657928415725, 0.667932535083157,
-         0.622700230679449, -0.175972651899464, -0.02217061461, 0.144515070286093,
-         -1.45211881901153, -0.235388804018903)
+    list("scale", -0.02217061461, 0.144515070286093, -0.757822989578577, 
+         -0.0677657928415725, 0.667932535083157, 0.622700230679449, 
+         -0.175972651899464, -1.45211881901153, -0.235388804018903, "TRUE")
   )
 })
 
@@ -35,13 +36,12 @@ test_that("Item Statistics table matches", {
   options$meanItem <- TRUE
   options$sdItem <- TRUE
   results <- jasptools::run("ReliabilityAnalysis", "test.csv", options, view=FALSE, quiet=TRUE)
-  table <- results[["results"]][["reliabilityItemsObj"]][["reliabilityItems"]][["data"]]
+  table <- results[["results"]][["reliabilityItemsObj"]][["data"]]
+  table
   expect_equal_tables(table,
-    list("contcor1", 0.0618194975467092, 0.0319398198963565, 0.061902485553013,
-         0.560156128034403, 0.05254867287, 1.01183864387684, "contcor2",
-         0.277152727398941, 0.161031927910319, 0.27739448681683, 0.442807451055322,
-         0.06968807084, 1.0041493380131, "contNormal", 0.79299280264282,
-         0.657010063712354, 0.793006727117146, 0.106272823965938, -0.18874858754,
-         1.05841360919316)
+    list("contcor1", 0.05254867287, 1.01183864387684, 0.560156128034403, 0.0618194975467092, 0.0319398198963565,
+         0.061902485553013, "TRUE", "contcor2", 0.06968807084, 1.0041493380131, 0.442807451055322, 0.277152727398941, 
+         0.161031927910319, 0.27739448681683, "TRUE", "contNormal", -0.18874858754, 1.05841360919316,
+         0.106272823965938, 0.79299280264282, 0.657010063712354, 0.793006727117146, "TRUE")
   )
 })

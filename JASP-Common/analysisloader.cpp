@@ -47,6 +47,8 @@ Analysis *AnalysisLoader::load(int id, string moduleName, string analysisName, c
 		Json::Value resultsMeta = analysisDesc.get("results", Json::nullValue);
 		Json::Value optionsJson = analysisDesc.get("options", Json::nullValue);
 
+        std::cout << "resultsMeta: " << resultsMeta.toStyledString();
+
 		if (optionsJson != Json::nullValue)
 			options->init(optionsJson);
 		else
