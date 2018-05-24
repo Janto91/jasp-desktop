@@ -601,8 +601,8 @@ AnovaRepeatedMeasures <- function(dataset=NULL, options, perform="run", callback
 
 	epsilonTable <- NULL
 
-	epsilonTable <- as.data.frame(matrix(0, length(termsRM.base64), 6))
-	colnames(epsilonTable) <- c("W", "p", "GG", "HF", "twoLevels", "termsNormal")
+	epsilonTable <- as.data.frame(matrix(0, length(termsRM.base64), 7))
+	colnames(epsilonTable) <- c("W", "p", "GG", "HF", "LB", "twoLevels", "termsNormal")
 
 
 	rownames(epsilonTable) <- termsRM.base64
@@ -624,6 +624,7 @@ AnovaRepeatedMeasures <- function(dataset=NULL, options, perform="run", callback
 			epsilonTable[i,"p"] <- NaN
 			epsilonTable[i,"GG"] <- 1
 			epsilonTable[i,"HF"] <- 1
+			epsilonTable[i,"LB"] <- 1
 			epsilonTable[i,"twoLevels"] <- TRUE
 
 		} else if (is.na(epsilon[1])) {
@@ -632,11 +633,13 @@ AnovaRepeatedMeasures <- function(dataset=NULL, options, perform="run", callback
 		  epsilonTable[i,"p"] <- NaN
 		  epsilonTable[i,"GG"] <- NaN
 		  epsilonTable[i,"HF"] <- NaN
+		  epsilonTable[i,"LB"] <- NaN
 		  epsilonTable[i,"twoLevels"] <- FALSE
 		  
 		} else {
 
 			HF <- epsilon[index, "HF eps"]
+			LBDenominator <- 1
 
 			if (HF > 1)
 				HF <- 1
@@ -645,6 +648,16 @@ AnovaRepeatedMeasures <- function(dataset=NULL, options, perform="run", callback
 			epsilonTable[i,"p"] <- mauchly[index,"p-value"]
 			epsilonTable[i,"GG"] <- epsilon[index, "GG eps"]
 			epsilonTable[i,"HF"] <- HF
+			
+			for (j in 1:length(modelTermsCase)) {
+			  for (k in 1:length(options$repeatedMeasuresFactors)) {
+			    if (modelTermsCase[[j]] == .v(options$repeatedMeasuresFactors[[k]]$name)) {
+			        LBDenominator <- LBDenominator*(length(options$repeatedMeasuresFactors[[k]]$levels) - 1)
+			      }
+			  }
+			}
+			
+			epsilonTable[i,"LB"] <- 1 / LBDenominator
 			epsilonTable[i,"twoLevels"] <- FALSE
 
 		}
@@ -1820,15 +1833,16 @@ AnovaRepeatedMeasures <- function(dataset=NULL, options, perform="run", callback
 			list(name="p", type="number", format="dp:3;p:.001"),
 			list(name = "VovkSellkeMPR", title = "VS-MPR", type = "number", format = "sf:4;dp:3"),
 			list(name="GG", type="number", format="sf:4;dp:3", title="Greenhouse-Geisser \u03B5"),
-			list(name="HF", type="number", format="sf:4;dp:3", title="Huynh-Feldt \u03B5"))
-	 } else {
+			list(name="HF", type="number", format="sf:4;dp:3", title="Huynh-Feldt \u03B5"),
+		  list(name="LB", type="number", format="sf:4;dp:3", title="Lower Bound \u03B5"))
+	} else {
 		 fields <- list(
 			 list(name="case", type="string", title=""),
 			 list(name="W", type="number", format="sf:4;dp:3", title="Mauchly's W"),
 			 list(name="p", type="number", format="dp:3;p:.001"),
 			 list(name="GG", type="number", format="sf:4;dp:3", title="Greenhouse-Geisser \u03B5"),
-			 list(name="HF", type="number", format="sf:4;dp:3", title="Huynh-Feldt \u03B5"))
-
+			 list(name="HF", type="number", format="sf:4;dp:3", title="Huynh-Feldt \u03B5"),
+		   list(name="LB", type="number", format="sf:4;dp:3", title="Lower Bound \u03B5"))
 	 }
 
 	sphericity[["schema"]] <- list(fields=fields)
@@ -1851,7 +1865,7 @@ AnovaRepeatedMeasures <- function(dataset=NULL, options, perform="run", callback
 				newGroup <- FALSE
 			}
 
-			row <- list("case"=termsRM.normal[[i]], "W"=".", "p"=".", "GG"=".", "HF"=".", ".isNewGroup" = newGroup)
+			row <- list("case"=termsRM.normal[[i]], "W"=".", "p"=".", "GG"=".", "HF"=".", "LB" = ".", ".isNewGroup" = newGroup)
 			sphericity.rows[[length(sphericity.rows) + 1]] <- row
 
 		}
@@ -1877,7 +1891,7 @@ AnovaRepeatedMeasures <- function(dataset=NULL, options, perform="run", callback
 			if (stateSphericity$twoLevels[i]) {
 
 				foot.index <- .addFootnote(footnotes, text="The repeated measure has only two levels. When the repeated measure has two levels, the assumption of sphericity is always met.")
-				row.footnotes <- list(W=list(foot.index), p=list(foot.index), GG=list(foot.index), HF=list(foot.index))
+				row.footnotes <- list(W=list(foot.index), p=list(foot.index), GG=list(foot.index), HF=list(foot.index), LB=list(foot.index))
 
 			} else {
 
@@ -1886,7 +1900,7 @@ AnovaRepeatedMeasures <- function(dataset=NULL, options, perform="run", callback
 
 
 			row <- list("case"=stateSphericity$termsNormal[i], "W"=stateSphericity$W[i], "p"=.clean(stateSphericity$p[i]), "GG"=stateSphericity$GG[i],
-						"HF"=stateSphericity$HF[i], ".isNewGroup" = newGroup, .footnotes=row.footnotes)
+						"HF"=stateSphericity$HF[i], "LB"=stateSphericity$LB[i], ".isNewGroup" = newGroup, .footnotes=row.footnotes)
 
 			if (options$VovkSellkeMPR){
 			  row[["VovkSellkeMPR"]] <- .VovkSellkeMPR(row[["p"]])

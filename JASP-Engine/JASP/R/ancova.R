@@ -48,6 +48,7 @@ Ancova <- function(dataset=NULL, options, perform="run", callback=function(...) 
 
 	anovaModel <- NULL
 	statePostHoc <- NULL
+	statePostHocBoots <- NULL
 	stateqqPlot <- NULL
 	stateDescriptivesPlot <- NULL
 	stateContrasts <- NULL
@@ -78,6 +79,13 @@ Ancova <- function(dataset=NULL, options, perform="run", callback=function(...) 
 			statePostHoc <- state$statePostHoc
 		}
 
+		if (is.list(diff) && diff[['modelTerms']] == FALSE && diff[['dependent']] == FALSE && diff[['wlsWeights']] == FALSE && diff[['kruskalVariablesAssigned']] == FALSE && diff[['postHocTestBootstrappingReplicates']] == FALSE) {
+		  
+		  # old post hoc bootstrapping results can be used
+		  
+		  statePostHocBoots <- state$statePostHocBoots
+		}
+		
 		if (is.list(diff) && diff[['modelTerms']] == FALSE && diff[['dependent']] == FALSE && diff[['wlsWeights']] == FALSE && diff[['qqPlot']] == FALSE &&
 			diff[['plotWidthQQPlot']] == FALSE && diff[['plotHeightQQPlot']] == FALSE) {
 
@@ -114,7 +122,8 @@ Ancova <- function(dataset=NULL, options, perform="run", callback=function(...) 
 		}
 
 		if (is.list(diff) && diff[['modelTerms']] == FALSE && diff[['dependent']] == FALSE && diff[['wlsWeights']] == FALSE &&
-			diff[['marginalMeansTerms']] == FALSE && diff[['marginalMeansCompareMainEffects']] == FALSE && diff[['marginalMeansCIAdjustment']] == FALSE) {
+			diff[['marginalMeansTerms']] == FALSE && diff[['marginalMeansCompareMainEffects']] == FALSE && diff[['marginalMeansCIAdjustment']] == FALSE &&
+			diff[['marginalMeansBootstrapping']] == FALSE && diff[['marginalMeansBootstrappingReplicates']] == FALSE) {
 
 			# old marginal means tables can be used
 
@@ -194,7 +203,6 @@ Ancova <- function(dataset=NULL, options, perform="run", callback=function(...) 
 	result <- .anovaTable(options, model, status, singular)
 	results[["anova"]] <- result$result
 	status <- result$status
-  
 
 
 	## Create Levene's Table
@@ -255,12 +263,20 @@ Ancova <- function(dataset=NULL, options, perform="run", callback=function(...) 
 
 	## Create Post Hoc Tables
 
-	result <- .anovaPostHocTable(dataset, options, perform, model, status, statePostHoc, singular)
+	result <- .anovaPostHocTable(dataset = dataset, options = options, perform = perform, model = model, status = status, statePostHoc = statePostHoc, singular = singular)
 
 	results[["posthoc"]] <- list(collection=result$result, title = "Post Hoc Tests")
 	status <- result$status
 	statePostHoc <- result$statePostHoc
 
+	## Create Post Hoc Bootstrapping Tables
+	if (options$postHocTestBootstrapping) {
+	  result <- .anovaPostHocBootstrapping(dataset = dataset, options = options, perform = perform, model = model, status = status, statePostHocBoots = statePostHocBoots, singular = singular)
+	
+	  results[["posthocBoots"]] <- list(collection=result$result, title = "Post Hoc Tests via Bootstrapping")
+	  status <- result$status
+	  statePostHocBoots <- result$statePostHocBoots
+	}
 
 
 	## Create Marginal Means Table
@@ -368,6 +384,7 @@ Ancova <- function(dataset=NULL, options, perform="run", callback=function(...) 
 		list(name="assumptionsObj", type="object", meta=list(list(name="levene", type="table"), list(name="qqPlot", type="image"))),
 		list(name="contrasts", type="collection", meta="table"),
 		list(name="posthoc", type="collection", meta="table"),
+		list(name="posthocBoots", type="collection", meta="table"),
 		list(name="marginalMeans", type="collection", meta="table"),
 		list(name="simpleEffects", type="table"),
 		list(name="kruskal", type="table"),
@@ -390,6 +407,7 @@ Ancova <- function(dataset=NULL, options, perform="run", callback=function(...) 
 	state[["model"]] <- anovaModel
 	state[["options"]] <- options
 	state[["statePostHoc"]] <- statePostHoc
+	state[["statePostHocBoots"]] <- statePostHocBoots
 	state[["stateqqPlot"]] <- stateqqPlot
 	state[["stateDescriptivesPlot"]] <- stateDescriptivesPlot
 	state[["stateContrasts"]] <- stateContrasts
@@ -406,7 +424,7 @@ Ancova <- function(dataset=NULL, options, perform="run", callback=function(...) 
 
 	} else {
 	  
-		return(list(results=results, status="complete", state=state, keep=c(stateqqPlot$data, keepDescriptivesPlot)))
+	  return(list(results=results, status="complete", state=state, keep=c(stateqqPlot$data, keepDescriptivesPlot)))
 	}
 }
 
@@ -1095,9 +1113,19 @@ Ancova <- function(dataset=NULL, options, perform="run", callback=function(...) 
 
 .anovaPostHocTable <- function(dataset, options, perform, model, status, statePostHoc, singular) {
 
-	posthoc.variables <- unlist(options$postHocTestsVariables)
-
-	posthoc.tables <- list()
+  posthoc.variables <- unlist(options$postHocTestsVariables)
+  posthoc.tables <- list()
+  posthoc.interaction <- FALSE
+  
+  reorderModelTerms <-  .reorderModelTerms(options)
+  modelTerms <- reorderModelTerms$modelTerms
+  
+  if (length(modelTerms) == 0) {
+    model.formula <- NULL
+  } else {
+    modelDef <- .modelFormula(modelTerms, options)
+    model.formula <- as.formula(modelDef$model.def)
+  }
 
 	if (is.null(statePostHoc))
 		statePostHoc <- list()
@@ -1105,6 +1133,16 @@ Ancova <- function(dataset=NULL, options, perform="run", callback=function(...) 
 	for (posthoc.var in posthoc.variables) {
 
 		posthoc.table <- list()
+		posthoc.table[["footnotes"]] <- list()
+		
+		# Check for interaction term
+		for (i in 1:length(modelTerms)) {
+		  if (length(modelTerms[[i]]$components) > 1 && posthoc.var %in% modelTerms[[i]]$components) {
+		    posthoc.table[["footnotes"]][[length(posthoc.table[["footnotes"]]) + 1]] <- list(symbol="<i>Note.</i>", 
+		                                              text="The posthoc variable is involved in interaction terms. Therefore, the results may not be meaningful.")
+		    break
+		  }
+		}
 
 		posthoc.table[["title"]] <- paste("Post Hoc Comparisons - ", posthoc.var, sep="")
 		posthoc.table[["name"]] <- paste("postHoc_", posthoc.var, sep="")
@@ -1118,8 +1156,8 @@ Ancova <- function(dataset=NULL, options, perform="run", callback=function(...) 
 
 		if (options$postHocTestEffectSize) {
 		  fields[[length(fields) + 1]] <- list(name="Cohen's d", title="Cohen's d", type="number", format="sf:4;dp:3")
-		  posthoc.table[["footnotes"]] <- list(list(symbol="<i>Note.</i>", 
-		                                            text="Cohen's d does not correct for multiple comparisons."))
+		  posthoc.table[["footnotes"]][[length(posthoc.table[["footnotes"]]) + 1]] <- list(symbol="<i>Note.</i>", 
+		                                            text="Cohen's d does not correct for multiple comparisons.")
 		}
 		
 		if (options$postHocTestsTukey)
@@ -1131,6 +1169,9 @@ Ancova <- function(dataset=NULL, options, perform="run", callback=function(...) 
 		if (options$postHocTestsBonferroni)
 			fields[[length(fields) + 1]] <- list(name="bonferroni", title="p<sub>bonf</sub>", type="number", format="dp:3;p:.001")
 
+		if (options$postHocTestsSidak)
+		  fields[[length(fields) + 1]] <- list(name="sidak", title="p<sub>šidák</sub>", type="number", format="dp:3;p:.001")
+		
 		if (options$postHocTestsHolm)
 			fields[[length(fields) + 1]] <- list(name="holm",title="p<sub>holm</sub>", type="number", format="dp:3;p:.001")
 
@@ -1143,7 +1184,7 @@ Ancova <- function(dataset=NULL, options, perform="run", callback=function(...) 
 
 		if (perform == "run" && status$ready && status$error == FALSE && is.null(statePostHoc[[posthoc.var]]) && !singular) {
 
-			statePostHoc[[posthoc.var]] <- list()
+		  statePostHoc[[posthoc.var]] <- list()
 
 			# Results using the Tukey method
 
@@ -1164,7 +1205,13 @@ Ancova <- function(dataset=NULL, options, perform="run", callback=function(...) 
 			names(contrastMatrix) <- .v(posthoc.var)
 			r <- multcomp::glht(model,do.call(multcomp::mcp, contrastMatrix))
 			statePostHoc[[posthoc.var]]$resultBonf <- summary(r,test=multcomp::adjusted("bonferroni"))
-      
+
+			# Results using the Sidak method
+			
+			unadjustedPvalues <- 2*pt(abs(tTukey), dfResidual, lower = FALSE)
+			nTests <- choose(nLevels, 2)
+			statePostHoc[[posthoc.var]]$resultSidak <- 1 - (1 - unadjustedPvalues)^(nTests)
+
 			# Results using the Holm method
 
 			statePostHoc[[posthoc.var]]$resultHolm <- summary(r,test=multcomp::adjusted("holm"))
@@ -1183,6 +1230,7 @@ Ancova <- function(dataset=NULL, options, perform="run", callback=function(...) 
 				pTukey <- ""
 				pScheffe <- ""
 				pBonf <- ""
+				pSidak <- ""
 				pHolm <- ""
 				effectSize <- ""
 				
@@ -1246,10 +1294,13 @@ Ancova <- function(dataset=NULL, options, perform="run", callback=function(...) 
 						if (options$postHocTestsBonferroni)
 							pBonf <- .clean(as.numeric(statePostHoc[[posthoc.var]]$resultBonf$test$pvalues[index2]))
 
+						if (options$postHocTestsSidak)
+						  pSidak <- .clean(as.numeric(statePostHoc[[posthoc.var]]$resultSidak[index1]))
+						
 						if (options$postHocTestsHolm)
 							pHolm <- .clean(as.numeric(statePostHoc[[posthoc.var]]$resultHolm$test$pvalues[index2]))
 					}
-
+				  
 					row[["Mean Difference"]] <- md
 					row[["SE"]]  <- SE
 					row[["t"]] <- t
@@ -1257,6 +1308,7 @@ Ancova <- function(dataset=NULL, options, perform="run", callback=function(...) 
 					row[["tukey"]] <- pTukey
 					row[["scheffe"]] <- pScheffe
 					row[["bonferroni"]] <- pBonf
+					row[["sidak"]] <- pSidak
 					row[["holm"]] <- pHolm
 
 					posthoc.table[["status"]] <- "complete"
@@ -1284,7 +1336,139 @@ Ancova <- function(dataset=NULL, options, perform="run", callback=function(...) 
 		posthoc.tables[[length(posthoc.tables)+1]] <- posthoc.table
 	}
 
-	list(result=posthoc.tables, status=status, statePostHoc=statePostHoc)
+  list(result=posthoc.tables, status=status, statePostHoc = statePostHoc)
+}
+
+
+.anovaPostHocBootstrapping <- function(dataset, options, perform, model, status, statePostHocBoots, singular) {
+
+  posthoc.variables.boots <- unlist(options$kruskalVariablesAssigned)
+  posthoc.tables <- list()
+  
+  reorderModelTerms <-  .reorderModelTerms(options)
+  modelTerms <- reorderModelTerms$modelTerms
+  
+  if (length(modelTerms) == 0) {
+    model.formula <- NULL
+  } else {
+    modelDef <- .modelFormula(modelTerms, options)
+    model.formula <- as.formula(modelDef$model.def)
+  }
+  
+  if (! is.null(statePostHocBoots) && statePostHocBoots$status == "complete") {
+      
+    for (i in 1:length(posthoc.variables.boots)) {
+      posthoc.tables[[length(posthoc.tables)+1]] <- statePostHocBoots[[i]]
+    }
+      
+  } else {
+      
+    statePostHocBoots <- list()
+      
+    for (posthoc.var in posthoc.variables.boots) {
+      
+      posthoc.table <- list()
+      
+      # Check for interaction term
+      for (i in 1:length(modelTerms)) {
+        if (length(modelTerms[[i]]$components) > 1 && posthoc.var %in% modelTerms[[i]]$components) {
+          posthoc.table[["footnotes"]] <- list(list(symbol="<i>Note.</i>", text="The posthoc variable is involved in interaction terms. Therefore, the results may not be meaningful."))
+          break
+        }
+      }
+      
+      posthoc.table[["title"]] <- paste("Post Hoc Comparisons with Bootstrapping - ", posthoc.var, sep="")
+      posthoc.table[["name"]] <- paste("postHocBoot_", posthoc.var, sep="")
+        
+      fields <- list(
+          list(name="(I)",title="", type="string", combine=TRUE),
+          list(name="(J)",title="", type="string"),
+          list(name="Mean Difference", type="number", format="sf:4;dp:3"),
+          list(name="Bias", type="number", format="sf:4;dp:3"),
+          list(name="SE", type="number", format="sf:4;dp:3"),
+          list(name="Lower CI Boots", title ="Lower", type="number", format="sf:4;dp:3", overTitle="95 % CI"),
+          list(name="Upper CI Boots", title ="Upper", type="number", format="sf:4;dp:3", overTitle="95 % CI"))
+        
+      posthoc.table[["schema"]] <- list(fields=fields)
+        
+      rows <- list()
+        
+      variable.levels <- levels(dataset[[ .v(posthoc.var) ]])
+      nLevels <- length(variable.levels)
+
+      if (perform == "run" && status$ready && status$error == FALSE && !singular && ! is.null(model.formula)) {
+          
+        .bootstrapping <- function(data, indices, options, method) {
+          d <- data[indices, , drop = FALSE] # allows boot to select sample
+          model <- .anovaModel(d, options)
+          result <- summary(multcomp::glht(model$model,do.call(multcomp::mcp, method)))
+          return(result$test$coefficients)
+        }
+            
+        methodBoots <- list("Tukey")
+        names(methodBoots) <- .v(posthoc.var)
+        bootstrap.summary <- boot::boot(data = dataset, statistic = .bootstrapping, R = options$postHocTestBootstrappingReplicates, options = options, method = methodBoots)
+        bootstrap.md <- bootstrap.summary$t0
+        bootstrap.bias <- apply(bootstrap.summary$t, 2, mean) - bootstrap.md
+        bootstrap.se <- apply(bootstrap.summary$t, 2, sd) - 0*bootstrap.md
+        index <- 1
+
+        for (i in 1:nLevels) {
+          for (j in .seqx(i+1, length(variable.levels))) {
+              
+            row <- list("(I)"=variable.levels[[i]], "(J)"=variable.levels[[j]], "Mean Difference" = ".", "Bias" = ".", "SE" = ".", "Lower CI Boots" = ".", "Upper CI Boots" = ".")
+            # Multiply by -1 and switch upper and lower CI value so that results match 
+            # other posthoc table
+            row[["Mean Difference"]] <- bootstrap.md[[index]] * (-1)
+            row[["Bias"]] <- bootstrap.bias[[index]] * (-1)
+            row[["SE"]] <- bootstrap.se[[index]]
+            bootstrap.ci <- boot::boot.ci(bootstrap.summary, type="bca", conf = 0.95, index=index)
+            row[["Lower CI Boots"]] <- as.numeric( bootstrap.ci$bca[5] ) * (-1)
+            row[["Upper CI Boots"]] <- as.numeric( bootstrap.ci$bca[4] ) * (-1)
+
+            posthoc.table[["status"]] <- "complete"
+              
+            if(length(rows) == 0)  {
+              row[[".isNewGroup"]] <- TRUE
+            } else {
+              row[[".isNewGroup"]] <- FALSE
+            }
+              
+            rows[[length(rows)+1]] <- row
+            index <- index + 1
+          }
+        }
+      } else {
+        for (i in 1:length(variable.levels)) {
+          for (j in .seqx(i+1, length(variable.levels))) {
+            row <- list("(I)"=variable.levels[[i]], "(J)"=variable.levels[[j]], "Mean Difference" = ".", "Bias" = ".", "SE" = ".", "Lower CI Boots" = ".", "Upper CI Boots" = ".")
+            rows[[length(rows)+1]] <- row
+          }
+        }
+      }
+        
+      posthoc.table[["data"]] <- rows
+        
+      if (singular)
+        posthoc.table[["footnotes"]] <- list(list(symbol = "<em>Warning.</em>", text = "Singular fit encountered; one or more predictor variables are a linear combination of other predictor variables"))
+        
+      if (status$error)
+        posthoc.table[["error"]] <- list(errorType="badData")
+        
+      posthoc.tables[[length(posthoc.tables)+1]] <- posthoc.table
+      statePostHocBoots[[length(statePostHocBoots)+1]] <- posthoc.table
+        
+    }
+      
+    if (perform == "init") {
+      statePostHocBoots[["status"]] <- "initiated"
+    } else {
+      statePostHocBoots[["status"]] <- "complete"
+    }
+      
+  }
+  
+  list(result=posthoc.tables, status=status, statePostHocBoots=statePostHocBoots)
 }
 
 .anovaDescriptivesTable <- function(dataset, options, perform, status, stateDescriptivesTable) {
@@ -1658,6 +1842,13 @@ Ancova <- function(dataset=NULL, options, perform="run", callback=function(...) 
 
 	}
 
+	if (options$marginalMeansBootstrapping == TRUE) {
+	  resultBoots <- .anovaMarginalMeansBootstrapping(dataset, options, perform, model, status, singular, stateMarginalMeans)
+	  for (i in 1:length(resultBoots$result)) {
+	    marginalMeans[[length(marginalMeans)+1]] <- resultBoots$result[[i]]
+	  }
+	}
+	
 	if (perform == "run" && status$ready && status$error == FALSE)  {
 
 		stateMarginalMeans <- marginalMeans
@@ -1669,6 +1860,181 @@ Ancova <- function(dataset=NULL, options, perform="run", callback=function(...) 
 	}
 
 	list(result=marginalMeans, status=status, stateMarginalMeans=stateMarginalMeans)
+}
+
+.anovaMarginalMeansBootstrapping <- function(dataset, options, perform, model, status, singular, stateMarginalMeans) {
+  
+  if (is.null(options$marginalMeansTerms))
+    return (list(result=NULL, status=status))
+  
+  terms <- options$marginalMeansTerms
+  
+  terms.base64 <- c()
+  terms.normal <- c()
+  
+  for (term in terms) {
+    
+    components <- unlist(term)
+    term.base64 <- paste(.v(components), collapse=":", sep="")
+    term.normal <- paste(components, collapse=" \u273B ", sep="")
+    
+    terms.base64 <- c(terms.base64, term.base64)
+    terms.normal <- c(terms.normal, term.normal)
+  }
+  
+  marginalMeans <- list()
+  
+  for (i in .indices(terms.base64)) {
+    
+    result <- list()
+
+    result[["title"]] <- paste("Marginal Means Bootstrapping - ",terms.normal[i], sep="")
+    result[["name"]] <- paste("marginalMeansBoots_",gsub("\u273B","*",gsub(" ", "", terms.normal[i], fixed=TRUE), fixed=TRUE), sep="")
+    
+    fields <- list()
+    
+    for(j in .indices(terms[[i]])) {
+      fields[[j]] <- list(name=terms[[i]][[j]], type="string", combine=TRUE)
+    }
+    
+    fields[[length(fields) + 1]] <- list(name="Marginal Mean", type="number", format="sf:4;dp:3")
+    fields[[length(fields) + 1]] <- list(name="Bias", type="number", format="sf:4;dp:3")
+    fields[[length(fields) + 1]] <- list(name="SE", type="number", format="sf:4;dp:3")
+    fields[[length(fields) + 1]] <- list(name="Lower CI", type="number", format="sf:4;dp:3")
+    fields[[length(fields) + 1]] <- list(name="Upper CI", type="number", format="sf:4;dp:3")
+    
+    footnotes <- .newFootnotes()
+    
+    result[["schema"]] <- list(fields=fields)
+    
+    termsTemp <- as.vector(terms[[i]])
+    
+    lvls <- list()
+    factors <- list()
+    
+    for (variable in termsTemp) {
+      
+      factor <- dataset[[ .v(variable) ]]
+      factors[[length(factors)+1]] <- factor
+      lvls[[variable]] <- levels(factor)
+    }
+    
+    cases <- rev(expand.grid(rev(lvls)))
+    cases <- as.data.frame(apply(cases,2,as.character))
+    
+    nRows <- dim(cases)[1]
+    nCol <- dim(cases)[2]
+    
+    if (perform == "run" && status$ready && status$error == FALSE)  {
+      
+      formula <- as.formula(paste("~", terms.base64[i]))
+      
+      .bootstrapping <- function(data, indices, formula, options) {
+        d <- data[indices, , drop = FALSE] # allows boot to select sample
+        anovaModel <- .anovaModel(d, options)
+        r <- summary(emmeans::lsmeans(anovaModel$model, formula), infer = c(FALSE,FALSE))
+        return(r$lsmean)
+      }
+      
+      bootstrap.summary <- boot::boot(data = dataset, statistic = .bootstrapping, R = options$marginalMeansBootstrappingReplicates, formula = formula, options = options)
+      r <- summary(emmeans::lsmeans(model, formula), infer = c(FALSE,FALSE))
+      
+      rows <- list()
+      
+      for(k in 1:nRows) {
+        
+        row <- list()
+        
+        for(j in 1:nCol) {
+          row[[ colnames(cases)[j] ]] <- cases[k,j]
+        }
+        
+        if(nCol > 1) {
+          index <- apply(r[,1:nCol], 1, function(x) all(x==cases[k,]))
+          index <- as.numeric(which(index == TRUE))
+        } else {
+          index <- k
+        }
+        
+        bootstrap.md <- bootstrap.summary$t0
+        bootstrap.bias <- apply(bootstrap.summary$t, 2, mean, na.rm = TRUE) - bootstrap.md
+        bootstrap.se <- apply(bootstrap.summary$t, 2, sd, na.rm = TRUE)
+        bootstrap.md <- bootstrap.md[[index]]
+        bootstrap.bias <- bootstrap.bias[[index]]
+        bootstrap.se <- bootstrap.se[[index]]
+        bootstrap.ci <- boot::boot.ci(bootstrap.summary, type="bca", conf = 0.95, index=index)
+        bootstrap.lower <- as.numeric( bootstrap.ci$bca[4] )
+        bootstrap.upper <- as.numeric( bootstrap.ci$bca[5] )
+        
+        row[["Marginal Mean"]] <- .clean(bootstrap.md)
+        row[["Bias"]] <- .clean(bootstrap.bias)
+        row[["SE"]] <- .clean(bootstrap.se)
+        row[["Lower CI"]] <- .clean(bootstrap.lower)
+        row[["Upper CI"]] <- .clean(bootstrap.upper)
+        
+        if(cases[k,nCol] == lvls[[ nCol ]][1]) {
+          row[[".isNewGroup"]] <- TRUE
+        } else {
+          row[[".isNewGroup"]] <- FALSE
+        }
+        
+        rows[[k]] <- row
+        
+      }
+      
+      result[["data"]] <- rows
+      result[["status"]] <- "complete"
+      
+    } else {
+      
+      rows <- list()
+      
+      for (k in 1:nRows) {
+        
+        row <- list()
+        
+        for (j in 1:nCol)
+          row[[ colnames(cases)[j] ]] <- cases[k,j]
+        
+        row[["Marginal Mean"]] <- "."
+        row[["Bias"]] <- "."
+        row[["SE"]] <- "."
+        row[["Lower CI"]] <- "."
+        row[["Upper CI"]] <- "."
+        
+        if(cases[k,nCol] == lvls[[ nCol ]][1]) {
+          row[[".isNewGroup"]] <- TRUE
+        } else {
+          row[[".isNewGroup"]] <- FALSE
+        }
+        
+        rows[[k]] <- row
+        
+      }
+      
+      result[["data"]] <- rows
+    }
+    
+    result[["footnotes"]] <- as.list(footnotes)
+    
+    if (status$error)
+      result[["error"]] <- list(error="badData")
+    
+    marginalMeans[[i]] <- result
+    
+  }
+  
+  if (perform == "run" && status$ready && status$error == FALSE)  {
+    
+    stateMarginalMeans <- marginalMeans
+    
+  } else {
+    
+    stateMarginalMeans <- NULL
+    
+  }
+  
+  list(result=marginalMeans, status=status, stateMarginalMeans=stateMarginalMeans)
 }
 
 .anovaSimpleEffects <- function(dataset, options, perform, fullAnovaTable, status, singular, stateSimpleEffects) {
@@ -2015,59 +2381,88 @@ Ancova <- function(dataset=NULL, options, perform="run", callback=function(...) 
 
 	if (perform == "run" && status$ready && !status$error && options$plotHorizontalAxis != "" && options$dependent != "") {
 
-		groupVars <- c(options$plotHorizontalAxis, options$plotSeparateLines, options$plotSeparatePlots)
-		groupVars <- groupVars[groupVars != ""]
-		groupVarsV <- .v(groupVars)
-		dependentV <- .v(options$dependent)
-
-		summaryStat <- .summarySE(as.data.frame(dataset), measurevar = dependentV, groupvars = groupVarsV,
+	  independent <- options$plotHorizontalAxis
+	  independentType <- NA
+	  if (independent %in% options$covariates) {
+	    independentType <- "covariate"
+	  } else if (independent %in% options$fixedFactors | independent %in% options$randomFactors) {
+	    independentType <- "factor"
+	  }
+	  moderator1 <- options$plotSeparateLines
+	  moderator2 <- options$plotSeparatePlots
+	  
+	  groupVars <- c(independent, moderator1, moderator2)
+	  groupVars <- groupVars[! groupVars %in% options$covariates]
+	  groupVars <- groupVars[groupVars != ""]
+	  groupVarsV <- .v(groupVars)
+	  dependentV <- .v(options$dependent)
+	  independentV <- .v(independent)
+	  moderator1V <- .v(moderator1)
+	  moderator2V <- .v(moderator2)
+	  
+	  base_breaks_x <- function(x){
+	    isFactor <- TRUE
+	    if (! is.factor(x)) {
+	      isFactor <- FALSE
+	    }
+	    b <- unique(as.numeric(x))
+	    d <- data.frame(y=-Inf, yend=-Inf, x=min(b), xend=max(b))
+	    if (isFactor == TRUE) {
+	      list(ggplot2::geom_segment(data=d, ggplot2::aes(x=x, y=y, xend=xend, yend=yend), inherit.aes=FALSE, size = 1))
+	    }	else {
+	      list(ggplot2::geom_segment(data=d, ggplot2::aes(x=x, y=y, xend=xend, yend=yend), inherit.aes=FALSE, size = 1),
+	           ggplot2::scale_x_continuous(breaks=c(min(b),max(b))))
+	    }
+	  }
+	  
+	  base_breaks_y <- function(x, plotErrorBars){
+	    if (plotErrorBars) {
+	      ci.pos <- c(x[,"dependent"], x[,"dependent"]-x[,"ci"],x[,"dependent"]+x[,"ci"])
+	      b <- pretty(ci.pos)
+	      d <- data.frame(x=-Inf, xend=-Inf, y=min(b), yend=max(b))
+	      list(ggplot2::geom_segment(data=d, ggplot2::aes(x=x, y=y, xend=xend, yend=yend), inherit.aes=FALSE, size = 1),
+	           ggplot2::scale_y_continuous(breaks=c(min(b),max(b))))
+	    } else {
+	      if (length(names(x))>1) {
+	        b <- pretty(x[,"dependent"])
+	      } else {
+	        b <- pretty(x)
+	      }
+	      d <- data.frame(x=-Inf, xend=-Inf, y=min(b), yend=max(b))
+	      list(ggplot2::geom_segment(data=d, ggplot2::aes(x=x, y=y, xend=xend, yend=yend), inherit.aes=FALSE, size = 1),
+	           ggplot2::scale_y_continuous(breaks=c(min(b),max(b))))
+	    }
+	  }
+	  
+	  if (independentType == "factor") {
+	    summaryStat <- .summarySE(as.data.frame(dataset), measurevar = dependentV, groupvars = groupVarsV,
 						conf.interval = options$confidenceIntervalInterval, na.rm = TRUE, .drop = FALSE, errorBarType = options$errorBarType)
 
-		colnames(summaryStat)[which(colnames(summaryStat) == dependentV)] <- "dependent"
+		  colnames(summaryStat)[which(colnames(summaryStat) == dependentV)] <- "dependent"
+		  colnames(summaryStat)[which(colnames(summaryStat) == .v(options$plotHorizontalAxis))] <- "plotHorizontalAxis"
 
-		if ( options$plotHorizontalAxis != "" ) {
-			colnames(summaryStat)[which(colnames(summaryStat) == .v(options$plotHorizontalAxis))] <- "plotHorizontalAxis"
-		}
+		  if ( options$plotSeparateLines != "" ) {
+			  colnames(summaryStat)[which(colnames(summaryStat) == .v(options$plotSeparateLines))] <- "plotSeparateLines"
+		  }
 
-		if ( options$plotSeparateLines != "" ) {
-			colnames(summaryStat)[which(colnames(summaryStat) == .v(options$plotSeparateLines))] <- "plotSeparateLines"
-		}
+		  if ( options$plotSeparatePlots != "" ) {
+			  colnames(summaryStat)[which(colnames(summaryStat) == .v(options$plotSeparatePlots))] <- "plotSeparatePlots"
+		  }
 
-		if ( options$plotSeparatePlots != "" ) {
-			colnames(summaryStat)[which(colnames(summaryStat) == .v(options$plotSeparatePlots))] <- "plotSeparatePlots"
-		}
+		  if (options$plotSeparatePlots != "") {
+		    subsetPlots <- levels(summaryStat[,"plotSeparatePlots"])
+		  }
+	  }
 
-		base_breaks_x <- function(x){
-			b <- unique(as.numeric(x))
-			d <- data.frame(y=-Inf, yend=-Inf, x=min(b), xend=max(b))
-			list(ggplot2::geom_segment(data=d, ggplot2::aes(x=x, y=y, xend=xend, yend=yend), inherit.aes=FALSE, size = 1))
-		}
-
-		base_breaks_y <- function(x, plotErrorBars){
-			if (plotErrorBars) {
-				ci.pos <- c(x[,"dependent"], x[,"dependent"]-x[,"ci"],x[,"dependent"]+x[,"ci"])
-				b <- pretty(ci.pos)
-				d <- data.frame(x=-Inf, xend=-Inf, y=min(b), yend=max(b))
-				list(ggplot2::geom_segment(data=d, ggplot2::aes(x=x, y=y, xend=xend, yend=yend), inherit.aes=FALSE, size = 1),
-					 ggplot2::scale_y_continuous(breaks=c(min(b),max(b))))
-			} else {
-				b <- pretty(x[,"dependent"])
-				d <- data.frame(x=-Inf, xend=-Inf, y=min(b), yend=max(b))
-				list(ggplot2::geom_segment(data=d, ggplot2::aes(x=x, y=y, xend=xend, yend=yend), inherit.aes=FALSE, size = 1),
-					 ggplot2::scale_y_continuous(breaks=c(min(b),max(b))))
-			}
-		}
-
-		if (options$plotSeparatePlots != "") {
-			subsetPlots <- levels(summaryStat[,"plotSeparatePlots"])
-			nPlots <- length(subsetPlots)
+	  if (options$plotSeparatePlots != "") {
+			nPlots <- length(levels(dataset[, .v(options$plotSeparatePlots)]))
 		} else {
 			nPlots <- 1
 		}
 
 		for (i in 1:nPlots) {
 
-			descriptivesPlot <- list()
+		  descriptivesPlot <- list()
 
 			if (options$plotSeparateLines != "") {
 
@@ -2082,75 +2477,168 @@ Ancova <- function(dataset=NULL, options, perform="run", callback=function(...) 
 				descriptivesPlot[["custom"]] <- list(width="plotWidthDescriptivesPlotNoLegend", height="plotHeightDescriptivesPlotNoLegend")
 
 			}
+			
+			if (independentType == "factor") {
+			  if (options$plotSeparatePlots != "") {
+				  summaryStatSubset <- subset(summaryStat,summaryStat[,"plotSeparatePlots"] == subsetPlots[i])
+			  } else {
+				  summaryStatSubset <- summaryStat
+			  }
 
-			if (options$plotSeparatePlots != "") {
-				summaryStatSubset <- subset(summaryStat,summaryStat[,"plotSeparatePlots"] == subsetPlots[i])
-			} else {
-				summaryStatSubset <- summaryStat
-			}
+			  if(options$plotSeparateLines == "") {
 
-			if(options$plotSeparateLines == "") {
-
-				p <- ggplot2::ggplot(summaryStatSubset, ggplot2::aes(x=plotHorizontalAxis,
+				  p <- ggplot2::ggplot(summaryStatSubset, ggplot2::aes(x=plotHorizontalAxis,
 											y=dependent,
 											group=1))
 
-			} else {
+			  } else {
 
-				p <- ggplot2::ggplot(summaryStatSubset, ggplot2::aes(x=plotHorizontalAxis,
+				  p <- ggplot2::ggplot(summaryStatSubset, ggplot2::aes(x=plotHorizontalAxis,
 											y=dependent,
 											group=plotSeparateLines,
 											shape=plotSeparateLines,
 											fill=plotSeparateLines))
 
-			}
+			  }
 
-			if (options$plotErrorBars) {
+			  if (options$plotErrorBars) {
 
-				pd <- ggplot2::position_dodge(.2)
-				p = p + ggplot2::geom_errorbar(ggplot2::aes(ymin=ciLower,
+				  pd <- ggplot2::position_dodge(.2)
+				  p = p + ggplot2::geom_errorbar(ggplot2::aes(ymin=ciLower,
 															ymax=ciUpper),
 															colour="black", width=.2, position=pd)
 
-			} else {
+			  } else {
 
-				pd <- ggplot2::position_dodge(0)
+				  pd <- ggplot2::position_dodge(0)
 
-			}
+			  }
 
-			p <- p + ggplot2::geom_line(position=pd, size = .7) +
-				ggplot2::geom_point(position=pd, size=4) +
-				ggplot2::scale_fill_manual(values = c(rep(c("white","black"),5),rep("grey",100)), guide=ggplot2::guide_legend(nrow=10)) +
-				ggplot2::scale_shape_manual(values = c(rep(c(21:25),each=2),21:25,7:14,33:112), guide=ggplot2::guide_legend(nrow=10)) +
-				ggplot2::scale_color_manual(values = rep("black",200),guide=ggplot2::guide_legend(nrow=10)) +
-				ggplot2::ylab(options$dependent) +
-				ggplot2::xlab(options$plotHorizontalAxis) +
-				ggplot2::labs(shape=options$plotSeparateLines, fill=options$plotSeparateLines) +
-				ggplot2::theme_bw() +
-				ggplot2::theme(#legend.justification=c(0,1), legend.position=c(0,1),
-					panel.grid.minor=ggplot2::element_blank(), plot.title = ggplot2::element_text(size=18),
-					panel.grid.major=ggplot2::element_blank(),
-					axis.title.x = ggplot2::element_text(size=18,vjust=-.2), axis.title.y = ggplot2::element_text(size=18,vjust=-1),
-					axis.text.x = ggplot2::element_text(size=15), axis.text.y = ggplot2::element_text(size=15),
-					panel.background = ggplot2::element_rect(fill = 'transparent', colour = NA),
-					plot.background = ggplot2::element_rect(fill = 'transparent', colour = NA),
-					legend.background = ggplot2::element_rect(fill = 'transparent', colour = NA),
-					panel.border = ggplot2::element_blank(), axis.line = ggplot2::element_blank(),
-					legend.key = ggplot2::element_blank(), #legend.key.width = grid::unit(10,"mm"),
-					legend.title = ggplot2::element_text(size=12),
-					legend.text = ggplot2::element_text(size = 12),
-					axis.ticks = ggplot2::element_line(size = 0.5),
-					axis.ticks.margin = grid::unit(1,"mm"),
-					axis.ticks.length = grid::unit(3, "mm"),
-					plot.margin = grid::unit(c(.5,0,.5,.5), "cm")) +
-				base_breaks_y(summaryStat, options$plotErrorBars) +
-				base_breaks_x(summaryStatSubset[,"plotHorizontalAxis"])
+			  p <- p + 
+			    ggplot2::geom_line(position=pd, size = .7) +
+				  ggplot2::geom_point(position=pd, size=4) +
+				  ggplot2::scale_fill_manual(values = c(rep(c("white","black"),5),rep("grey",100)), guide=ggplot2::guide_legend(nrow=10)) +
+				  ggplot2::scale_shape_manual(values = c(rep(c(21:25),each=2),21:25,7:14,33:112), guide=ggplot2::guide_legend(nrow=10)) +
+				  ggplot2::scale_color_manual(values = rep("black",200),guide=ggplot2::guide_legend(nrow=10)) +
+				  ggplot2::ylab(options$dependent) +
+				  ggplot2::xlab(options$plotHorizontalAxis) +
+				  ggplot2::labs(shape=options$plotSeparateLines, fill=options$plotSeparateLines) +
+				  ggplot2::theme_bw() +
+				  ggplot2::theme(#legend.justification=c(0,1), legend.position=c(0,1),
+					  panel.grid.minor=ggplot2::element_blank(), plot.title = ggplot2::element_text(size=18),
+					  panel.grid.major=ggplot2::element_blank(),
+					  axis.title.x = ggplot2::element_text(size=18,vjust=-.2), axis.title.y = ggplot2::element_text(size=18,vjust=-1),
+					  axis.text.x = ggplot2::element_text(size=15), axis.text.y = ggplot2::element_text(size=15),
+					  panel.background = ggplot2::element_rect(fill = 'transparent', colour = NA),
+					  plot.background = ggplot2::element_rect(fill = 'transparent', colour = NA),
+					  legend.background = ggplot2::element_rect(fill = 'transparent', colour = NA),
+					  panel.border = ggplot2::element_blank(), axis.line = ggplot2::element_blank(),
+					  legend.key = ggplot2::element_blank(), #legend.key.width = grid::unit(10,"mm"),
+					  legend.title = ggplot2::element_text(size=12),
+					  legend.text = ggplot2::element_text(size = 12),
+					  axis.ticks = ggplot2::element_line(size = 0.5),
+					  axis.ticks.margin = grid::unit(1,"mm"),
+					  axis.ticks.length = grid::unit(3, "mm"),
+					  plot.margin = grid::unit(c(.5,0,.5,.5), "cm")) +
+				  base_breaks_y(summaryStat, options$plotErrorBars) +
+				  base_breaks_x(summaryStatSubset[,"plotHorizontalAxis"])
+			
+			} else if (independentType == "covariate") {
+			  
+			  if (options$plotSeparatePlots != "") {
+			    level <- levels(dataset[, .v(options$plotSeparatePlots)])[i]
+			    data <- dataset[dataset[[moderator2V]] == level, ]
+			  } else {
+			    data <- dataset
+			  }
+			  
+			  if (options$plotSeparateLines == "") {
+			    
+			    p <- ggplot2::ggplot(data, ggplot2::aes(x=data[[independentV]], y=data[[dependentV]])) + ggplot2::geom_point(na.rm = TRUE)
+			    p <- p + ggplot2::labs(x = .unv(independentV), y = .unv(dependentV))
+			    
+			    if (options$plotErrorBars) {
+			      
+			      if (options$errorBarType == "confidenceInterval") {
+			        
+			        p <- p + ggplot2::geom_smooth(method="lm", se=TRUE, level = options$confidenceIntervalInterval, size = .7, color = "black")
+			        
+			      } else if (options$errorBarType == "standardError") {
+			        
+			        p <- p + ggplot2::geom_smooth(method="lm", se=TRUE, level = 0.6826, size = .7, color = "black")
+			        
+			      } 
+			     
+			    } else {
+			      
+			      p <- p + ggplot2::geom_smooth(method="lm", se=FALSE, size = .7, color = "black")
+			      
+			    }
+			        
+			  } else {
+			    
+			    p <- ggplot2::ggplot(data, ggplot2::aes(x=data[[independentV]], y=data[[dependentV]], group = data[[moderator1V]], shape = data[[moderator1V]], fill = data[[moderator1V]])) + ggplot2::geom_point(na.rm = TRUE)
+			    p <- p + ggplot2::labs(x = .unv(independentV), y = .unv(dependentV), group = .unv(moderator1V))
 
-			if (nPlots > 1) {
-				descriptivesPlot[["title"]] <- paste(options$plotSeparatePlots,": ",subsetPlots[i], sep = "")
-			} else {
-				descriptivesPlot[["title"]] <- "Descriptives Plot"
-			}
+			    if (options$plotErrorBars) {
+			      
+			      if (options$errorBarType == "confidenceInterval") {
+			        
+			        p <- p + ggplot2::geom_smooth(method="lm", se=TRUE, level = options$confidenceIntervalInterval, size = .7, color = "black")
+			        
+			      } else if (options$errorBarType == "standardError") {
+			        
+			        p <- p + ggplot2::geom_smooth(method="lm", se=TRUE, level = 0.6826, size = .7, color = "black")
+			        
+			      } 
+			      
+			    } else {
+			      
+			      p <- p + ggplot2::geom_smooth(method="lm", se=FALSE, size = .7, color = "black")
+			      
+			    }
+			    
+			  }
+			  
+			  p <- p + ggplot2::scale_fill_manual(values = c(rep(c("white","black"),5),rep("grey",100)), guide=ggplot2::guide_legend(nrow=10)) +
+			    ggplot2::scale_shape_manual(values = c(rep(c(21:25),each=2),21:25,7:14,33:112), guide=ggplot2::guide_legend(nrow=10)) +
+			    ggplot2::scale_color_manual(values = rep("black",200),guide=ggplot2::guide_legend(nrow=10)) +
+			    ggplot2::labs(shape=options$plotSeparateLines, fill=options$plotSeparateLines) +
+		      ggplot2::theme_bw() +
+			    ggplot2::theme(#legend.justification=c(0,1), legend.position=c(0,1),
+			      panel.grid.minor=ggplot2::element_blank(), 
+			      plot.title = ggplot2::element_text(size=18),
+			      panel.grid.major=ggplot2::element_blank(),
+			      axis.title.x = ggplot2::element_text(size=18,vjust=-.2), 
+			      axis.title.y = ggplot2::element_text(size=18,vjust=-1),
+			      axis.text.x = ggplot2::element_text(size=15), 
+			      axis.text.y = ggplot2::element_text(size=15),
+			      panel.background = ggplot2::element_rect(fill = 'transparent', colour = NA),
+			      plot.background = ggplot2::element_rect(fill = 'transparent', colour = NA),
+			      legend.background = ggplot2::element_rect(fill = 'transparent', colour = NA),
+			      panel.border = ggplot2::element_blank(), 
+			      axis.line = ggplot2::element_blank(),
+			      legend.key = ggplot2::element_blank(), #legend.key.width = grid::unit(10,"mm"),
+			      legend.title = ggplot2::element_text(size=12),
+			      legend.text = ggplot2::element_text(size = 12),
+			      axis.ticks = ggplot2::element_line(size = 0.5),
+			      axis.ticks.margin = grid::unit(1,"mm"),
+			      axis.ticks.length = grid::unit(3, "mm"),
+			      plot.margin = grid::unit(c(.5,0,.5,.5), "cm"))
+			    p <- p + base_breaks_y(dataset[, dependentV], FALSE)
+			    p <- p + base_breaks_x(dataset[, .v(options$plotHorizontalAxis)])
+
+			  }
+
+			  if (nPlots > 1) {
+			    if (independentType == "factor") {
+				    descriptivesPlot[["title"]] <- paste(options$plotSeparatePlots,": ",subsetPlots[i], sep = "")
+			    } else if (independentType == "covariate") {
+			      descriptivesPlot[["title"]] <- paste(options$plotSeparatePlots,": ",levels(dataset[, .v(options$plotSeparatePlots)])[i], sep = "")
+			    }
+			  } else {
+				  descriptivesPlot[["title"]] <- "Descriptives Plot"
+			  }
 
 			if (options$plotSeparateLines != "") {
 

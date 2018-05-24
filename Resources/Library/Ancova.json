@@ -75,7 +75,27 @@
 			"name": "postHocTestEffectSize",
 			"type": "Boolean"
 		},
-		{
+        {
+            "name": "postHocTestBootstrapping",
+            "type": "Boolean"
+        },
+        {
+            "default": 5000,
+            "name": "postHocTestBootstrappingReplicates",
+            "type": "Integer",
+            "min": 100
+        },
+        {
+            "name": "marginalMeansBootstrapping",
+            "type": "Boolean"
+        },
+        {
+            "default": 5000,
+            "name": "marginalMeansBootstrappingReplicates",
+            "type": "Integer",
+            "min": 100
+        },
+        {
 			"name": "postHocTestsHolm",
 			"type": "Boolean"
 		},
@@ -88,6 +108,10 @@
 			"name": "postHocTestsScheffe",
 			"type": "Boolean"
 		},
+        {
+            "name": "postHocTestsSidak",
+            "type": "Boolean"
+        },
 		{
 			"name": "marginalMeansTerms",
 			"type": "Terms"

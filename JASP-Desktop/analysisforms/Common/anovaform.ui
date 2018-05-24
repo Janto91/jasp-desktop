@@ -952,14 +952,24 @@
                <property name="bottomMargin">
                 <number>0</number>
                </property>
-               <item row="0" column="0">
+               <item row="2" column="0">
                 <widget class="QLabel" name="label_14">
                  <property name="text">
                   <string>Confidence interval adjustment</string>
                  </property>
                 </widget>
                </item>
+               <item row="0" column="0">
+                <widget class="BoundCheckBox" name="marginalMeansBootstrapping">
+                 <property name="text">
+                  <string>From</string>
+                 </property>
+                </widget>
+               </item>
                <item row="0" column="1">
+                <widget class="BoundTextBox" name="marginalMeansBootstrappingReplicates"/>
+               </item>
+               <item row="2" column="1">
                 <widget class="BoundComboBox" name="marginalMeansCIAdjustment">
                  <item>
                   <property name="text">
@@ -978,27 +988,14 @@
                  </item>
                 </widget>
                </item>
+               <item row="0" column="2">
+                <widget class="QLabel" name="label_20">
+                 <property name="text">
+                  <string>bootstraps</string>
+                 </property>
+                </widget>
+               </item>
               </layout>
-             </widget>
-            </item>
-            <item row="2" column="3">
-             <spacer name="horizontalSpacer_2">
-              <property name="orientation">
-               <enum>Qt::Horizontal</enum>
-              </property>
-              <property name="sizeHint" stdset="0">
-               <size>
-                <width>40</width>
-                <height>20</height>
-               </size>
-              </property>
-             </spacer>
-            </item>
-            <item row="1" column="0" colspan="2">
-             <widget class="BoundCheckBox" name="marginalMeansCompareMainEffects">
-              <property name="text">
-               <string>Compare marginal means to 0</string>
-              </property>
              </widget>
             </item>
             <item row="0" column="0" colspan="4">
@@ -1034,6 +1031,26 @@
                 </widget>
                </item>
               </layout>
+             </widget>
+            </item>
+            <item row="2" column="3">
+             <spacer name="horizontalSpacer_2">
+              <property name="orientation">
+               <enum>Qt::Horizontal</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>40</width>
+                <height>20</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+            <item row="1" column="0" colspan="2">
+             <widget class="BoundCheckBox" name="marginalMeansCompareMainEffects">
+              <property name="text">
+               <string>Compare marginal means to 0</string>
+              </property>
              </widget>
             </item>
            </layout>
@@ -1192,6 +1209,20 @@
             <string>Correction</string>
            </property>
            <layout class="QGridLayout" name="gridLayout_17">
+            <item row="1" column="0">
+             <widget class="BoundCheckBox" name="postHocTestsScheffe">
+              <property name="text">
+               <string>Scheffe</string>
+              </property>
+             </widget>
+            </item>
+            <item row="0" column="0">
+             <widget class="BoundCheckBox" name="postHocTestsTukey">
+              <property name="text">
+               <string>Tukey</string>
+              </property>
+             </widget>
+            </item>
             <item row="3" column="0">
              <widget class="BoundCheckBox" name="postHocTestsHolm">
               <property name="text">
@@ -1206,17 +1237,10 @@
               </property>
              </widget>
             </item>
-            <item row="0" column="0">
-             <widget class="BoundCheckBox" name="postHocTestsTukey">
+            <item row="4" column="0">
+             <widget class="BoundCheckBox" name="postHocTestsSidak">
               <property name="text">
-               <string>Tukey</string>
-              </property>
-             </widget>
-            </item>
-            <item row="1" column="0">
-             <widget class="BoundCheckBox" name="postHocTestsScheffe">
-              <property name="text">
-               <string>Scheffe</string>
+               <string>Šidák</string>
               </property>
              </widget>
             </item>
@@ -1279,6 +1303,13 @@
          </size>
         </property>
         <layout class="QGridLayout" name="gridLayout_7">
+         <item row="3" column="0">
+          <widget class="BoundCheckBox" name="postHocTestBootstrapping">
+           <property name="text">
+            <string>Post hoc test from</string>
+           </property>
+          </widget>
+         </item>
          <item row="0" column="2">
           <widget class="QWidget" name="widget_27" native="true">
            <layout class="QGridLayout" name="gridLayout_36">
@@ -1410,10 +1441,20 @@
            </property>
           </widget>
          </item>
-         <item row="1" column="0">
+         <item row="2" column="0">
           <widget class="BoundCheckBox" name="dunnTest">
            <property name="text">
             <string>Dunn's post hoc test</string>
+           </property>
+          </widget>
+         </item>
+         <item row="3" column="1">
+          <widget class="BoundTextBox" name="postHocTestBootstrappingReplicates"/>
+         </item>
+         <item row="3" column="2">
+          <widget class="QLabel" name="label_21">
+           <property name="text">
+            <string>bootstraps</string>
            </property>
           </widget>
          </item>

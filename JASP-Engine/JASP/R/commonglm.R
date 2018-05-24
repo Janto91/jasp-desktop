@@ -155,7 +155,8 @@
       list(name="pvl", title="p", type="number", format="dp:3;p:.001"),
       list(name="fad", title="McFadden R²", type="number", format="sf:4;dp:3"),
       list(name="nag", title="Nagelkerke R²", type="number", format="sf:4;dp:3"),
-      list(name="tju", title="Tjur R²", type="number", format="sf:4;dp:3")
+      list(name="tju", title="Tjur R²", type="number", format="sf:4;dp:3"),
+      list(name="cas", title="Cox & Snell R²", type="number", format="sf:4;dp:3")
     )
 
     if (options[["method"]] != "enter") {
@@ -181,7 +182,7 @@
       if (options[["method"]] == "enter") {
         # Two rows: h0 and h1
         lr <- .lrtest(glmObj[[1]], glmObj[[2]])
-
+        
         rows <- list(
           list(mod = "H\u2080",
                dev = .clean(glmObj[[1]][["deviance"]]),
@@ -192,7 +193,8 @@
                pvl = .clean(NULL),
                fad = .clean(NULL),
                nag = .clean(NULL),
-               tju = .clean(NULL)),
+               tju = .clean(NULL),
+               cas = .clean(NULL)),
           list(mod = "H\u2081",
                dev = .clean(glmObj[[2]][["deviance"]]),
                aic = .clean(glmObj[[2]][["aic"]]),
@@ -202,7 +204,8 @@
                pvl = .clean(lr[["pval"]]),
                fad = .clean(.mcFadden(glmObj[[2]], glmObj[[1]])),
                nag = .clean(.nagelkerke(glmObj[[2]], glmObj[[1]])),
-               tju = .clean(.tjur(glmObj[[2]])))
+               tju = .clean(.tjur(glmObj[[2]])),
+               cas = .clean(.coxSnell(glmObj[[2]], glmObj[[1]])))
         )
 
       } else {
@@ -216,9 +219,12 @@
                 options[["method"]] == "stepwise") {
               fadden <- .mcFadden(mObj, glmObj[[1]])
               nagel <- .nagelkerke(mObj, glmObj[[1]])
+              coxSn <- .coxSnell(mObj, glmObj[[1]])
+              
             } else {
               fadden <- -1*.mcFadden(glmObj[[1]], mObj)
               nagel <- -1*.nagelkerke(glmObj[[1]], mObj)
+              coxSn <- -1*.coxSnell(glmObj[[1]], mObj)
             }
 
             lr <- .lrtest(glmObj[[midx]], glmObj[[midx-1]])
@@ -232,7 +238,8 @@
               pvl = .clean(lr[["pval"]]),
               fad = .clean(fadden),
               nag = .clean(nagel),
-              tju = .clean(.tjur(mObj))
+              tju = .clean(.tjur(mObj)),
+              cas = .clean(coxSn)
             )
           } else {
             rows[[midx]] <- list(
@@ -245,7 +252,8 @@
               pvl = .clean(NULL),
               fad = .clean(.mcFadden(mObj, mObj)),
               nag = .clean(.nagelkerke(mObj, mObj)),
-              tju = .clean(.tjur(mObj))
+              tju = .clean(.tjur(mObj)),
+              cas = .clean(.coxSnell(mObj, mObj))
             )
           }
         }
@@ -253,8 +261,8 @@
     } else {
       rows <- list(
         list(mod = "H\u2080", dev = ".", fad = .clean(NULL), nag = .clean(NULL),
-             tju = .clean(NULL), aic = "."),
-        list(mod = "H\u2081", dev = ".", fad = ".", nag = ".", tju = ".", aic = ".")
+             tju = .clean(NULL), cas = .clean(NULL), aic = "."),
+        list(mod = "H\u2081", dev = ".", fad = ".", nag = ".", tju = ".", cas = ".", aic = ".")
       )
     }
 
@@ -265,6 +273,7 @@
 }
 
 .glmEstimatesTable <- function(glmObj, options, perform, type) {
+  
   out <- NULL
   if (type == "binomial" && options[["coeffEstimates"]]) {
 
@@ -299,6 +308,9 @@
       list(name="or", title = "Odds Ratio", type="number", format="sf:4;dp:3"),
       list(name="zval", title = "z", type="number", format="sf:4;dp:3"),
       list(name="pval", title = "p", type="number", format="dp:3;p:.001"),
+      list(name="waldsta", title = "Wald Statistic", type="number", format="sf:4;dp:3", overTitle = "Wald Test"),
+      list(name="walddf", title = "df", type="number", format="sf:4;dp:3", overTitle = "Wald Test"),
+      list(name="waldp", title = "p", type="number", format="dp:3;p:.001", overTitle = "Wald Test"),
       list(name="vsmpr", title = "VS-MPR\u002A", type="number", format="sf:4;dp:3"),
       list(name="cilo", title = "Lower bound", type="number", format="dp:3", overTitle=ciTitle),
       list(name="ciup", title = "Upper bound", type="number", format="dp:3", overTitle=ciTitle)
@@ -307,7 +319,7 @@
 
     # then determine which ones we need
     selectFields <- with(options, c(multimod, TRUE, TRUE, TRUE, stdCoeff,
-                                    oddsRatios, TRUE, TRUE, VovkSellkeMPR,
+                                    oddsRatios, TRUE, TRUE, TRUE, TRUE, TRUE, VovkSellkeMPR,
                                     coeffCI, coeffCI))
 
     out[["schema"]] <- list(fields=fields[selectFields])
@@ -354,7 +366,7 @@
         } else {
           expon <- function(x) x
         }
-
+        
 
         if (length(rn) == 1) {
           s <- unname(s)
@@ -363,6 +375,8 @@
             s[3] <- s[1]/s[2] # new z
             s[4] <- 2*pnorm(-abs(s[3])) # new p
           }
+          waldtest <- mdscore::wald.test(glmObj[[2]], term = 1)
+          
           rows[[1]] <- list(param = .clean(.formatTerm(rn, glmObj[[2]])),
                             est = .clean(s[1]),
                             se = .clean(s[2]),
@@ -370,6 +384,9 @@
                             or = .clean(exp(s[1])),
                             zval = .clean(s[3]),
                             pval = .clean(s[4]),
+                            waldsta = .clean(as.numeric(waldtest$W)),
+                            walddf = .clean(as.numeric(1)),
+                            waldp = .clean(as.numeric(waldtest$pvalue)),
                             vsmpr = .clean(.VovkSellkeMPR(s[4])),
                             cilo = .clean(expon(s[1] - c * s[2])),
                             ciup = .clean(expon(s[1] + c * s[2])))
@@ -381,6 +398,8 @@
           }
           for (i in seq_along(rn)) {
 
+            waldtest <- mdscore::wald.test(glmObj[[2]], term = i)
+
             rows[[i]] <- list(param = .clean(.formatTerm(rn[i], glmObj[[2]])),
                               est = .clean(s[i,1]),
                               se = .clean(s[i,2]),
@@ -388,6 +407,9 @@
                               or = .clean(exp(s[i,1])),
                               zval = .clean(s[i,3]),
                               pval = .clean(s[i,4]),
+                              waldsta = .clean(as.numeric(waldtest$W)),
+                              walddf = .clean(as.numeric(1)),
+                              waldp = .clean(as.numeric(waldtest$pvalue)),
                               vsmpr = .clean(.VovkSellkeMPR(s[i,4])),
                               cilo = .clean(expon(s[i,1] - c * s[i,2])),
                               ciup = .clean(expon(s[i,1] + c * s[i,2])))
@@ -418,6 +440,8 @@
               s[3] <- s[1]/s[2] # new z
               s[4] <- 2*pnorm(-abs(s[3])) # new p
             }
+            waldtest <- mdscore::wald.test(mObj, term = 1)
+            
             rows[[length(rows)+1]] <- list(
               model = as.character(midx),
               param = .clean(.formatTerm(rn, mObj)),
@@ -427,6 +451,9 @@
               or = .clean(exp(s[1])),
               zval = .clean(s[3]),
               pval = .clean(s[4]),
+              waldsta = .clean(as.numeric(waldtest$W)),
+              walddf = .clean(as.numeric(1)),
+              waldp = .clean(as.numeric(waldtest$pvalue)),
               vsmpr = .clean(.VovkSellkeMPR(s[4])),
               cilo = .clean(expon(s[1] - c * s[2])),
               ciup = .clean(expon(s[1] + c * s[2])),
@@ -439,6 +466,9 @@
               s[,4] <- 2*pnorm(-abs(s[,3])) # new p
             }
             for (i in seq_along(rn)) {
+              
+              waldtest <- mdscore::wald.test(mObj, term = i)
+
               row <- list(
                 model = as.character(midx),
                 param = .clean(.formatTerm(rn[i], mObj)),
@@ -448,6 +478,9 @@
                 or = .clean(exp(s[i,1])),
                 zval = .clean(s[i,3]),
                 pval = .clean(s[i,4]),
+                waldsta = .clean(as.numeric(waldtest$W)),
+                walddf = .clean(as.numeric(1)),
+                waldp = .clean(as.numeric(waldtest$pvalue)),
                 vsmpr = .clean(.VovkSellkeMPR(s[i,4])),
                 cilo = .clean(expon(s[i,1] - c * s[i,2])),
                 ciup = .clean(expon(s[i,1] + c * s[i,2]))
@@ -468,7 +501,8 @@
     } else {
       rows <- list(
         list(param = ".", est = ".", se = ".", std = ".", or = ".",
-             zval = ".", pval = ".", vsmpr = ".", cilo = ".", ciup = ".")
+             zval = ".", pval = ".", waldsta = ".", walddf = ".", waldp = ".",
+             vsmpr = ".", cilo = ".", ciup = ".")
       )
     }
 
@@ -913,8 +947,22 @@
   ps <- predict(glmModel, type = "response")
   ys <- glmModel[["y"]]
   return(max(c(0,mean(ps[ys])-mean(ps[-ys]))))
-
 }
+
+.coxSnell <- function(glmModel, nullModel) {
+  rightSide <- deparse(glmModel[["formula"]][[3]])
+  if (length(rightSide == 1) && rightSide %in% c("1", "0")) {
+    # intercept-only model needs fix because of computer precision limits
+    return(NULL)
+  } else {
+    l0 <- -0.5*nullModel[["deviance"]]
+    lm <- as.numeric(logLik(glmModel))
+    n <- length(glmModel[["y"]])
+    coxSnell <- 1 - exp(l0 - lm)^(2 / n)
+    return(max(c(0,coxSnell)))
+  }
+}
+
 
 .bic <- function(glmModel) {
   return(log(length(glmModel[["y"]]))*length(coef(glmModel))+glmModel[["deviance"]])
