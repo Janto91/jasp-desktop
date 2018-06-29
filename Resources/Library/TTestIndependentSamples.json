@@ -24,7 +24,17 @@
 			"name": "mannWhitneyU",
 			"type": "Boolean"
 		},
-		{
+        {
+            "name": "bootstrapping",
+            "type": "Boolean"
+        },
+        {
+            "name": "bootstrappingReplicates",
+            "type": "Integer",
+            "default": 5000,
+            "min": 100
+        },
+        {
 			"name": "equalityOfVariancesTests",
 			"type": "Boolean"
 		},
@@ -44,7 +54,7 @@
 			"name": "effectSize",
 			"type": "Boolean"
 		},
-		{
+        {
 			"format": "%",
 			"max": 0.999,
 			"min": 0.000,
@@ -68,6 +78,12 @@
 			"name": "normalityTests",
 			"type": "Boolean"
 		},
+        {
+            "name": "effectSizeSD",
+            "options": [ "effectSizeSDPooled", "effectSizeSDGroup1", "effectSizeSDGroup2" ],
+            "default": "effectSizeSDPooled",
+            "type": "List"
+        },
 		{
 			"name": "missingValues",
 			"options": [ "excludeAnalysisByAnalysis", "excludeListwise" ],

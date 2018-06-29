@@ -148,7 +148,7 @@ test_that("Post Hoc table results match", {
   expect_equal_tables(table,
     list("control", "experimental", -0.0830902357515323, 0.21391801479091,
          -0.388420937024623, -0.078154288522293197, 0.698555762823947,
-         0.927393971055831, 0.698555762823947, 0.698555762823947, "TRUE")
+         0.927393971055831, 0.698555762823947, "", 0.698555762823947, "TRUE")
   )
 })
 
@@ -263,4 +263,95 @@ test_that("Analysis handles errors", {
   results <- jasptools::run("Ancova", "test.csv", options, view=FALSE, quiet=TRUE)
   expect_identical(results[["results"]][["anova"]][["error"]][["errorType"]], "badData",
                   label="Negative WLS weights check")
+})
+
+# Below are the unit tests for Andy Field's book
+
+# Chapter 6
+test_that("Fields Book - Chapter 6 results match", {
+  options <- jasptools::analysisOptions("Ancova")
+  options$dependent <- "Happiness"
+  options$fixedFactors <- "Dose"
+  options$covariates <- "Puppy_love"
+  options$modelTerms <- list(
+    list(components="Dose"),
+    list(components="Puppy_love")
+  )
+  options$marginalMeansTerms <- c("Dose")
+  options$marginalMeansBootstrapping <- TRUE
+  options$marginalMeansBootstrappingReplicates <- 1000
+  options$contrasts <- list(list(contrast = "simple", variable = "Dose"))
+  set.seed(1) # For Bootstrapping Unit Tests
+  results <- jasptools::run("Ancova", dataset = rio::import("~/Dropbox/ej_andy_shared/spss_tutorials/spss_glm_06/www/Puppy Love.sav"), options, view=FALSE, quiet=TRUE)
+  tableOutput1 <- results[["results"]][["anova"]][["data"]]
+  expect_equal_tables(tableOutput1,
+                      list("Dose", 25.18519, 2, 12.5926, 4.141929, 0.02744654, "TRUE",
+                           "Puppy_love", 15.07575, 1, 15.07575, 4.958681, 0.03483338, "TRUE",
+                           "Residual", 79.04712, 26, 3.040274, "", "", "TRUE")
+  )
+  tableOutput2a <- results[["results"]][["marginalMeans"]][["collection"]][[1]][["data"]]
+  expect_equal_tables(tableOutput2a,
+                      list(1, 2.92637, 0.5962045, 1.700854, 4.151886, "TRUE",
+                           2, 4.71205, 0.6207971, 3.435984, 5.988117, "FALSE",
+                           3, 5.151251, 0.5026323, 4.118076, 6.184427, "FALSE")
+  )
+  tableOutput2b <- results[["results"]][["marginalMeans"]][["collection"]][[2]][["data"]]
+  expect_equal_tables(tableOutput2b,
+                      list(1, 2.92637, -0.01753049, 0.4052424, 2.255964, 3.969381, "TRUE",
+                           2, 4.71205, 0.0344565, 0.3758842, 4.069462, 5.576816, "FALSE",
+                           3, 5.151251, 0.01653462, 0.648977, 4.055325, 6.671648, "FALSE")
+  )
+  tableOutput3 <- results[["results"]][["contrasts"]][["collection"]][[1]][["data"]]
+  expect_equal_tables(tableOutput3,
+                      list("2 - 1", 1.78568, 0.8493553, 2.102395, 0.04535356, "TRUE",
+                           "3 - 1", 2.224881, 0.8028109, 2.771364, 0.01017501, "FALSE")
+  )
+  options <- jasptools::analysisOptions("Ancova")
+  options$dependent <- "Happiness"
+  options$fixedFactors <- "Dose"
+  options$covariates <- "Puppy_love"
+  options$modelTerms <- list(
+    list(components="Dose"),
+    list(components="Puppy_love")
+  )
+  options$contrasts <- list(list(contrast = "none", variable = "Dose"))
+  options$postHocTestsVariables <- c("Dose")
+  options$postHocTestsSidak <- TRUE
+  options$postHocTestsTukey <- FALSE
+  options$kruskalVariablesAssigned <- c("Dose")
+  options$postHocTestBootstrapping <- TRUE
+  options$postHocTestBootstrappingReplicates <- 5000
+  set.seed(1) # For Bootstrapping Unit Tests
+  results <- jasptools::run("Ancova", dataset = rio::import("~/Dropbox/ej_andy_shared/spss_tutorials/spss_glm_06/www/Puppy Love.sav"), options, view=FALSE, quiet=TRUE)
+  tableOutput4a <- results[["results"]][["posthoc"]][["collection"]][[1]][["data"]]
+  expect_equal_tables(tableOutput4a,
+                      list(1, 2, -1.78568, 0.8493553, -2.102395, "", "", "", "", 0.1299831, "", "TRUE",
+                           1, 3, -2.224881, 0.8028109, -2.771364, "", "", "", "", 0.0302155, "", "FALSE",
+                           2, 3, -0.4392012, 0.8112214, -0.5414073, "", "", "", "", 0.9324995, "", "FALSE")
+  )
+  tableOutput4b <- results[["results"]][["posthocBoots"]][["collection"]][[1]][["data"]]
+  expect_equal_tables(tableOutput4b,
+                      list(1, 2, -1.78568, -0.01552806, 0.5088203, -2.82467, -0.7807666, "TRUE",
+                           1, 3, -2.224881, 0.0187791, 0.72639, -3.745609, -0.8706909, "FALSE",
+                           2, 3, -0.4392012, 0.03425721, 0.7239277, -1.989235, 0.8850431, "FALSE")
+  )
+  options <- jasptools::analysisOptions("Ancova")
+  options$dependent <- "Happiness"
+  options$fixedFactors <- c("Dose")
+  options$covariates <- c("Puppy_love")
+  options$modelTerms <- list(
+    list(components="Dose"),
+    list(components="Puppy_love"),
+    list(components=c("Dose", "Puppy_love"))
+  )
+  options$contrasts <- list(list(contrast = "none", variable = "Dose"))
+
+  results <- jasptools::run("Ancova", dataset = rio::import("~/Dropbox/ej_andy_shared/spss_tutorials/spss_glm_06/www/Puppy Love.sav"), options, view=FALSE, quiet=TRUE)
+  tableOutput5 <- results[["results"]][["anova"]][["data"]]
+  expect_equal_tables(tableOutput5,
+                      list("Dose", 36.55756, 2, 18.27878, 7.483569, 0.002979564, "TRUE",
+                           "Puppy_love", 17.18222, 1, 17.18222, 7.034625, 0.01394746, "FALSE",
+                           "Dose <unicode> Puppy_love", 20.42659, 2, 10.2133, 4.181456, 0.02766711, "FALSE",
+                           "Residual", 58.62052, 24, 2.442522, "", "", "TRUE")
+  )
 })

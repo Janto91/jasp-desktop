@@ -144,7 +144,7 @@ test_that("Post Hoc table results match", {
   expect_equal_tables(table,
     list(0, 1, 0.163364220743842, 0.214904085649005, 0.760172707980336,
          0.15401876311258, 0.448976320466698, 0.448976320466698, 0.448976320466698,
-         0.448976320466698, "TRUE")
+         "", 0.448976320466698, "TRUE")
     )
 })
 
@@ -292,4 +292,196 @@ test_that("Analysis handles errors", {
   results <- jasptools::run("Anova", "test.csv", options, view=FALSE, quiet=TRUE)
   expect_identical(results[["results"]][["anova"]][["error"]][["errorType"]], "badData",
                   label="Negative WLS weights check")
+})
+
+# Below are the unit tests for Andy Field's book
+
+# Chapter 4
+test_that("Fields Book - Chapter 4 results match", {
+  options <- jasptools::analysisOptions("Anova")
+  options$dependent <- "Happiness"
+  options$fixedFactors <- "Dose"
+  options$modelTerms <- list(
+    list(components="Dose")
+  )
+  options$descriptives <- TRUE
+  options$postHocTestsVariables <- "Dose"
+  options$postHocTestEffectSize <- TRUE
+  results <- jasptools::run("Anova", dataset = rio::import("~/Dropbox/ej_andy_shared/spss_tutorials/spss_glm_04/www/Puppies Dummy.sav"), options, view=FALSE, quiet=TRUE)
+  tableOutput2 <- results[["results"]][["descriptivesObj"]][["descriptivesTable"]][["data"]]
+  tableOutput3 <- results[["results"]][["anova"]][["data"]]
+  cohensdPuppiesOutput <- list(results[["results"]][["posthoc"]][["collection"]][[1]][["data"]][[1]][["Cohen's d"]], results[["results"]][["posthoc"]][["collection"]][[1]][["data"]][[2]][["Cohen's d"]], results[["results"]][["posthoc"]][["collection"]][[1]][["data"]][[3]][["Cohen's d"]]) 
+  expect_equal_tables(tableOutput2,
+                      list(1, 5, 2.2, 1.30384, "TRUE",
+                           2, 5, 3.2, 1.30384, "FALSE",
+                           3, 5, 5, 1.581139, "FALSE")
+  )
+  expect_equal_tables(tableOutput3,
+                      list("Dose", 20.13333, 2, 10.06667, 5.118644, 0.02469429, "TRUE",
+                           "Residual", 23.6, 12, 1.966667, "", "", "TRUE")
+  )
+  # Insert test for Welch and the Brown-Forsythe F-statistics (Output 4)
+  expect_equal_tables(cohensdPuppiesOutput,
+                      list(-0.766965, -1.932184, -1.242118)
+  )
+  
+  options <- jasptools::analysisOptions("Anova")
+  options$dependent <- "injury"
+  options$fixedFactors <- "hero"
+  options$modelTerms <- list(
+    list(components="hero")
+  )
+  options$postHocTestsVariables <- "hero"
+  options$postHocTestEffectSize <- TRUE
+  results <- jasptools::run("Anova", dataset = rio::import("~/Dropbox/ej_andy_shared/spss_tutorials/spss_glm_04/www/Superhero.sav"), options, view=FALSE, quiet=TRUE)
+  cohensdSupermanOutput <- list(results[["results"]][["posthoc"]][["collection"]][[1]][["data"]][[1]][["Cohen's d"]], 
+                                results[["results"]][["posthoc"]][["collection"]][[1]][["data"]][[2]][["Cohen's d"]], 
+                                results[["results"]][["posthoc"]][["collection"]][[1]][["data"]][[3]][["Cohen's d"]], 
+                                results[["results"]][["posthoc"]][["collection"]][[1]][["data"]][[4]][["Cohen's d"]], 
+                                results[["results"]][["posthoc"]][["collection"]][[1]][["data"]][[5]][["Cohen's d"]], 
+                                results[["results"]][["posthoc"]][["collection"]][[1]][["data"]][[6]][["Cohen's d"]])
+  expect_equal_tables(cohensdSupermanOutput,
+                      list(1.261983, 1.620304, 2.602089, 0.4878571, 1.480746, 0.8234014)
+  )
+})
+
+# Chapter 5
+test_that("Fields Book - Chapter 5 results match", {
+  options <- jasptools::analysisOptions("Anova")
+  options$dependent <- "Happiness"
+  options$fixedFactors <- "Dose"
+  options$modelTerms <- list(
+    list(components="Dose")
+  )
+  options$contrasts <- list(list(contrast = "Helmert", variable = "Dose"))
+  options$postHocTestsVariables <- c("Dose")
+  results <- jasptools::run("Anova", dataset = rio::import("~/Dropbox/ej_andy_shared/spss_tutorials/spss_glm_04/www/Puppies Dummy.sav"), options, view=FALSE, quiet=TRUE)
+  tableOutput5 <- results[["results"]][["contrasts"]][["collection"]][[1]][["data"]]
+  tableOutput6 <- results[["results"]][["posthoc"]][["collection"]][[1]][["data"]]
+  expect_equal_tables(tableOutput5,
+                      list("1 - 2, 3", -1.9, 0.7681146, -2.473589, 0.02930022, "TRUE",
+                           "2 - 3", -1.8, 0.8869423, -2.029444, 0.06519221, "FALSE")
+  )
+  expect_equal_tables(tableOutput6,
+                      list(1, 2, -1, 0.8869423, -1.127469, "", 0.5163208, "", "", "", "", "TRUE",
+                           1, 3, -2.8, 0.8869423, -3.156913, "", 0.02097356, "", "", "", "", "FALSE",
+                           2, 3, -1.8, 0.8869423, -2.029444, "", 0.1473583, "", "", "", "", "FALSE")
+  )
+
+  options <- jasptools::analysisOptions("Anova")
+  options$dependent <- "injury"
+  options$fixedFactors <- "hero"
+  options$modelTerms <- list(
+    list(components="hero")
+  )
+  options$contrasts <- list(list(contrast = "simple", variable = "hero"))
+  results <- jasptools::run("Anova", dataset = rio::import("~/Dropbox/ej_andy_shared/spss_tutorials/spss_glm_05/www/Superhero.sav"), options, view=FALSE, quiet=TRUE)
+  tableOutput8Part1 <- results[["results"]][["contrasts"]][["collection"]][[1]][["data"]][[1]]
+  options$contrasts <- list(list(contrast = "repeated", variable = "hero"))
+  results <- jasptools::run("Anova", dataset = rio::import("~/Dropbox/ej_andy_shared/spss_tutorials/spss_glm_05/www/Superhero.sav"), options, view=FALSE, quiet=TRUE)
+  tableOutput8Part2 <- results[["results"]][["contrasts"]][["collection"]][[1]][["data"]][[3]]
+  tableOutput8 <- list(tableOutput8Part1, tableOutput8Part2)
+  expect_equal_tables(tableOutput8,
+                      list("2 - 1", -18.70833, 6.990846, -2.676119, 0.0127195, "TRUE",
+                           "3 - 4", 9.125, 6.472266, 1.409862, 0.1704314, "FALSE")
+  )
+  
+  options <- jasptools::analysisOptions("Anova")
+  options$dependent <- "injury"
+  options$fixedFactors <- "hero"
+  options$modelTerms <- list(
+    list(components="hero")
+  )
+  options$postHocTestsVariables <- "hero"
+  options$postHocTestsTukey <- FALSE
+  options$postHocTestsBonferroni <- TRUE
+  results <- jasptools::run("Anova", dataset = rio::import("~/Dropbox/ej_andy_shared/spss_tutorials/spss_glm_05/www/Superhero.sav"), options, view=FALSE, quiet=TRUE)
+  tableOutput9 <- results[["results"]][["posthoc"]][["collection"]][[1]][["data"]]
+  expect_equal_tables(tableOutput9,
+                      list(1, 2, 18.70833, 6.990846, 2.676119, "", "", "", 0.07631699, "", "", "TRUE",
+                           1, 3, 24.95833, 6.990846, 3.570145, "", "", "", 0.008512499, "", "", "FALSE",
+                           1, 4, 34.08333, 6.990846, 4.875423, "", "", "", 0.0002801258, "", "", "FALSE",
+                           2, 3, 6.25, 6.472266, 0.9656587, "", "", "", 1, "", "", "FALSE",
+                           2, 4, 15.375, 6.472266, 2.37552, "", "", "", 0.1510885, "", "", "FALSE",
+                           3, 4, 9.125, 6.472266, 1.409862, "", "", "", 1, "", "", "FALSE")
+  )
+})
+
+
+# Chapter 7
+test_that("Fields Book - Chapter 7 results match", {
+  options <- jasptools::analysisOptions("Anova")
+  options$dependent <- "Attractiveness"
+  options$fixedFactors <- c("FaceType", "Alcohol")
+  options$modelTerms <- list(
+    list(components="FaceType"),
+    list(components="Alcohol"),
+    list(components=c("FaceType", "Alcohol"))
+  )
+  options$contrasts <- list(list(contrast = "none", variable = "FaceType"), list(contrast = "Helmert", variable = "Alcohol"))
+  options$postHocTestsVariables <- c("Alcohol")
+  options$kruskalVariablesAssigned <- c("Alcohol")
+  options$postHocTestsBonferroni <- TRUE
+  options$postHocTestsTukey <- FALSE
+  options$postHocTestBootstrapping <- TRUE
+  options$postHocTestBootstrappingReplicates <- 1000
+  set.seed(1)
+  results <- jasptools::run("Anova", dataset = rio::import("~/Dropbox/ej_andy_shared/spss_tutorials/spss_glm_07/www/Goggles.sav"), options, view=FALSE, quiet=TRUE)
+  tableOutput1 <- results[["results"]][["anova"]][["data"]]
+  expect_equal_tables(tableOutput1,
+                      list("FaceType", 21.33333, 1, 21.33333, 15.58261, 0.0002952236, "TRUE",
+                           "Alcohol", 16.54167, 2, 8.270833, 6.041304, 0.004943389, "FALSE",
+                           "FaceType <unicode> Alcohol", 23.29167, 2, 11.64583, 8.506522, 0.0007912739, "FALSE",
+                           "Residual", 57.5, 42, 1.369048, "", "", "TRUE")
+  )
+  tableOutput2 <- results[["results"]][["contrasts"]][["collection"]][[1]][["data"]]
+  expect_equal_tables(tableOutput2,
+                      list("0 - 1, 2", -1.09375, 0.3582572, -3.052974, 0.003921402, "TRUE",
+                           "1 - 2", -0.6875, 0.4136798, -1.661914, 0.1039773, "FALSE")
+  )
+  tableOutput3a <- results[["results"]][["posthoc"]][["collection"]][[1]][["data"]]
+  expect_equal_tables(tableOutput3a,
+                      list(0, 1, -0.75, 0.4136798, -1.812997, "", "", "", 0.2309501, "", "", "TRUE",
+                           0, 2, -1.4375, 0.4136798, -3.47491, "", "", "", 0.003599568, "", "", "FALSE",
+                           1, 2, -0.6875, 0.4136798, -1.661914, "", "", "", 0.3119319, "", "", "FALSE")
+  )
+  tableOutput3b <- results[["results"]][["posthocBoots"]][["collection"]][[1]][["data"]]
+  expect_equal_tables(tableOutput3b,
+                      list(0, 1, -0.75, 0.009656129, 0.4194893, -1.646094, 0.03172597, "TRUE",
+                           0, 2, -1.4375, 0.01227821, 0.4321352, -2.284006, -0.648591, "FALSE",
+                           1, 2, -0.6875, 0.00262208, 0.3934077, -1.457499, 0.08496317, "FALSE")
+  )
+  
+  options <- jasptools::analysisOptions("Anova")
+  options$dependent <- "Attractiveness"
+  options$fixedFactors <- c("FaceType", "Alcohol")
+  options$modelTerms <- list(
+    list(components="FaceType"),
+    list(components="Alcohol"),
+    list(components=c("FaceType", "Alcohol"))
+  )
+  options$contrasts <- list(list(contrast = "none", variable = "FaceType"), list(contrast = "none", variable = "Alcohol"))
+  options$marginalMeansTerms <- list(list("FaceType", "Alcohol"))
+  options$marginalMeansBootstrapping <- TRUE
+  options$marginalMeansBootstrappingReplicates <- 1000
+  set.seed(1) # For Bootstrapping Unit Tests
+  results <- jasptools::run("Anova", dataset = rio::import("~/Dropbox/ej_andy_shared/spss_tutorials/spss_glm_07/www/Goggles.sav"), options, view=FALSE, quiet=TRUE)
+  tableOutput4a <- results[["results"]][["marginalMeans"]][["collection"]][[1]][["data"]]
+  expect_equal_tables(tableOutput4a,
+                      list(0, 0, 3.5, 0.4136798, 2.66516, 4.33484, "TRUE",
+                           0, 1, 4.875, 0.4136798, 4.04016, 5.70984, "FALSE",
+                           0, 2, 6.625, 0.4136798, 5.79016, 7.45984, "FALSE",
+                           1, 0, 6.375, 0.4136798, 5.54016, 7.20984, "TRUE",
+                           1, 1, 6.5, 0.4136798, 5.66516, 7.33484, "FALSE",
+                           1, 2, 6.125, 0.4136798, 5.29016, 6.95984, "FALSE")
+  )
+  tableOutput4b <- results[["results"]][["marginalMeans"]][["collection"]][[2]][["data"]]
+  expect_equal_tables(tableOutput4b,
+                      list(0, 0, 3.5, 0.006070666, 0.5640803, 2.33385, 4.62333, "TRUE",
+                           0, 1, 4.875, -0.01314135, 0.4322475, 4.142857, 5.847589, "FALSE",
+                           0, 2, 6.625, -0.01705802, 0.3793216, 6, 7.5, "FALSE",
+                           1, 0, 6.375, -0.003094173, 0.3289257, 5.79557, 7.052643, "TRUE",
+                           1, 1, 6.5, -0.001616834, 0.3307976, 5.857143, 7.166667, "FALSE",
+                           1, 2, 6.125, -0.002099714, 0.3913636, 5.428571, 7, "FALSE")
+  )
 })

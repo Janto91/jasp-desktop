@@ -135,6 +135,16 @@
 			"options": [ "None", "Bonferroni", "Sidak" ],
 			"default": "None"
 		},
+        {
+            "name": "marginalMeansBootstrapping",
+            "type": "Boolean"
+        },
+        {
+            "default": 5000,
+            "name": "marginalMeansBootstrappingReplicates",
+            "type": "Integer",
+            "min": 100
+        },
 		{
 			"name": "simpleFactor",
 			"type": "Variable"

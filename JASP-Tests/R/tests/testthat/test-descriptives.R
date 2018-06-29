@@ -110,3 +110,37 @@ test_that("Frequencies table matches with missing values", {
 #   testPlot <- results[["state"]][["figures"]][[1]]
 #   expect_equal_plots(testPlot, "boxplot", dir="Descriptives")
 # })
+
+# Below are the unit tests for Andy Field's book
+
+# Chapter 4
+test_that("Fields Book - Chapter 4 results match", {
+  options <- jasptools::analysisOptions("Descriptives")
+  options$variables <- "Happiness"
+  options$splitby <- "Dose"
+  options$mean <- TRUE
+  options$standardDeviation <- TRUE
+  options$standardErrorMean <- TRUE
+  options$minimum <- TRUE
+  options$maximum <- TRUE
+  results <- jasptools::run("Descriptives", dataset = rio::import("~/Dropbox/ej_andy_shared/spss_tutorials/spss_glm_04/www/Puppies Dummy.sav"), options, view=FALSE, quiet=TRUE)
+  tableOutput2a <- results[["results"]][["stats"]][["data"]]
+  expect_equal_tables(tableOutput2a,
+                      list("Happiness", 1, 5, 0, 2.2, 4, 1, 1.30384, 0.5830952, "TRUE",
+                           "Happiness", 2, 5, 0, 3.2, 5, 2, 1.30384, 0.5830952,
+                           "Happiness", 3, 5, 0, 5, 7, 3, 1.581139, 0.7071068)
+  )
+  # Total row
+  options <- jasptools::analysisOptions("Descriptives")
+  options$variables <- "Happiness"
+  options$mean <- TRUE
+  options$standardDeviation <- TRUE
+  options$standardErrorMean <- TRUE
+  options$minimum <- TRUE
+  options$maximum <- TRUE
+  results <- jasptools::run("Descriptives", dataset = rio::import("~/Dropbox/ej_andy_shared/spss_tutorials/spss_glm_04/www/Puppies Dummy.sav"), options, view=FALSE, quiet=TRUE)
+  tableOutput2b <- results[["results"]][["stats"]][["data"]]
+  expect_equal_tables(tableOutput2b,
+                      list("Happiness", 15, 0, 3.466667, 7, 1, 1.76743, 0.4563485)
+  )
+})

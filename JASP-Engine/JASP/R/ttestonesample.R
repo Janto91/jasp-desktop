@@ -79,7 +79,6 @@ TTestOneSample <- function(dataset = NULL, options, perform = "run",
 	ttest <- list()
 
 	## does the user want mean differences, effect sizes and confidence intervals?
-	wantsEffect <- options$effectSize
 	wantsDifference <- options$meanDifference
 	wantsConfidenceMeanDiff <- (options$meanDiffConfidenceIntervalCheckbox &&  options$meanDifference)
 	wantsConfidenceEffSize <- (options$effSizeConfidenceIntervalCheckbox && options$effectSize)
@@ -106,25 +105,22 @@ TTestOneSample <- function(dataset = NULL, options, perform = "run",
 		# potentially dangerous next line - removing df. Not posssible to remove by name
 		fields <- fields[-2] #Wilcoxon's test doesn't have degrees of freedoms
 		nameOfLocationParameter <- "Hodges-Lehmann Estimate"
-		nameOfEffectSize <- "Rank-Biserial Correlation"
 	} else if (wantsStudents && onlyTest) {
 		.addFootnote(footnotes, symbol = "<em>Note.</em>", text = "Student's t-test.")
 		testStat <- "t"
 		nameOfLocationParameter <- "Mean Difference"
-		nameOfEffectSize <- "Cohen's d"
 	} else if(wantsZtest && onlyTest){
 	  .addFootnote(footnotes, symbol = "<em>Note.</em>", text = "Z test.")
 	  testStat <- "Z"
 	  # potentially dangerous next line - removing df. Not posssible to remove by name
 	  fields <- fields[-2] #Z test doesn't have degrees of freedoms
 	  nameOfLocationParameter <- "Mean Difference"
-	  nameOfEffectSize <- "Cohen's d"
 	} else {
 		testStat <- "Statistic"
 		nameOfLocationParameter <-  "Location Parameter"
-		nameOfEffectSize <-  "Effect Size"
 	}
-
+	
+	nameOfEffectSize <-  "Effect Size"
 	ttest[["title"]] <- title
 
 	## if only conducting Student's, the table should have "t" as column name
@@ -180,7 +176,7 @@ TTestOneSample <- function(dataset = NULL, options, perform = "run",
 		textDifference <- paste0(textDifference, ".")
 		.addFootnote(footnotes, symbol = "<em>Note.</em>", text = textDifference)
 	}
-	
+
 	if (wantsConfidenceMeanDiff) {
 	  interval <- 100 * percentConfidenceMeanDiff
 	  title <- paste0(interval, "% CI for ", nameOfLocationParameter)
@@ -193,48 +189,51 @@ TTestOneSample <- function(dataset = NULL, options, perform = "run",
 	                                       overTitle = title)
 	}
 
-	if (wantsEffect) {
-		fields[[length(fields) + 1]] <- list(name = "d", title = nameOfEffectSize,
-											 type = "number",  format = "sf:4;dp:3")
-		
-		# preparing footnote - paste if selected
-		textEffect <- ""
-		if(wantsStudents){
-		  textEffect <- "For the Student t-test, effect size is given by Cohen's <em>d</em>"
-		}
-		
-		if(wantsWilcox){
-		  if(wantsStudents){
-		    textEffect <- paste0(textEffect,
-		                         "; for the Wilcoxon test, effect size is given by the matched rank biserial correlation")
-		  } else{
-		    textEffect <- "For the Wilcoxon test, effect size is given by the matched rank biserial correlation"
-		  }
-		}
-		
-		if(wantsZtest){
-		  if(onlyTest){
-		    textEffect <- "For the Z test, effect size is given by Cohen's <em>d</em> (based on the provided population standard deviation)"
-		  } else{
-		    textEffect <- paste0(textEffect,
-		                         "; for the Z test, effect size is given by Cohen's <em>d</em> (based on the provided population standard deviation)")
-		  }
-		}
-		
-		textEffect <- paste0(textEffect, ".")
-		.addFootnote(footnotes, symbol = "<em>Note.</em>", text = textEffect)
-	}
 
-	if (wantsConfidenceEffSize) {
-	  interval <- 100 * percentConfidenceEffSize
-	  title <- paste0(interval, "% CI for ", nameOfEffectSize)
+	## add effect sizes
+	if (options$effectSize) {
 	  
-	  fields[[length(fields) + 1]] <- list(name = "lowerCIeffectSize", type = "number",
-	                                       format = "sf:4;dp:3", title = "Lower",
-	                                       overTitle = title)
-	  fields[[length(fields) + 1]] <- list(name = "upperCIeffectSize", type = "number",
-	                                       format = "sf:4;dp:3", title = "Upper",
-	                                       overTitle = title)
+	  if (options$student || options$zTest) {
+	    
+	    fields[[length(fields) + 1]] <- list(name = "cohensd", title = "Cohen's d",
+	                                         type = "number", format = "sf:4;dp:3")
+	    
+	    if (wantsConfidenceEffSize) {
+	      fields[[length(fields) + 1]] <- list(name = "cohensdLowerCI", type = "number",
+	                                           format = "sf:4;dp:3", title = "Lower",
+	                                           overTitle = paste0(100 * percentConfidenceEffSize, "% CI for Cohen's d"))
+	      fields[[length(fields) + 1]] <- list(name = "cohensdUpperCI", type = "number",
+	                                           format = "sf:4;dp:3", title = "Upper",
+	                                           overTitle = paste0(100 * percentConfidenceEffSize, "% CI for Cohen's d"))
+	    }
+	    
+	    fields[[length(fields) + 1]] <- list(name = "hedgesg", title = "Hedges' g",
+	                                         type = "number", format = "sf:4;dp:3")
+	    if (wantsConfidenceEffSize) {
+	      fields[[length(fields) + 1]] <- list(name = "hedgesgLowerCI", type = "number",
+	                                           format = "sf:4;dp:3", title = "Lower",
+	                                           overTitle = paste0(100 * percentConfidenceEffSize, "% CI for Hedges' g"))
+	      fields[[length(fields) + 1]] <- list(name = "hedgesgUpperCI", type = "number",
+	                                           format = "sf:4;dp:3", title = "Upper",
+	                                           overTitle = paste0(100 * percentConfidenceEffSize, "% CI for Hedges' g"))
+	    }
+	  }
+	  
+	  if (options$mannWhitneyU) {
+	    
+	    fields[[length(fields) + 1]] <- list(name = "rbc", title = "Rank biserial correlation",
+	                                         type = "number", format = "sf:4;dp:3")
+	    
+	    if (wantsConfidenceEffSize) {
+	      fields[[length(fields) + 1]] <- list(name = "rbcLowerCI", type = "number",
+	                                           format = "sf:4;dp:3", title = "Lower",
+	                                           overTitle = paste0(100 * percentConfidenceEffSize, "% CI for Rank biserial correlation"))
+	      fields[[length(fields) + 1]] <- list(name = "rbcUpperCI", type = "number",
+	                                           format = "sf:4;dp:3", title = "Upper",
+	                                           overTitle = paste0(100 * percentConfidenceEffSize, "% CI for Rank biserial correlation"))
+	    }
+	  }
+	  
 	}
 
 	ttest[["schema"]] <- list(fields = fields)
@@ -243,12 +242,10 @@ TTestOneSample <- function(dataset = NULL, options, perform = "run",
 	### check the directionality
 	if (options$hypothesis == "greaterThanTestValue") {
 		direction <- "greater"
-		note <- "For all tests, the alternative hypothesis specifies that the mean
-					is greater than "
+		note <- "For all tests, the alternative hypothesis specifies that the mean is greater than "
 	} else if (options$hypothesis == "lessThanTestValue") {
 		direction <- "less"
-		note <- "For all tests, the alternative hypothesis specifies that the mean
-					is less than "
+		note <- "For all tests, the alternative hypothesis specifies that the mean is less than "
 	} else {
 	  direction <- "two.sided"
 		note <- "For all tests, the alternative hypothesis specifies that the population mean is different from "
@@ -308,81 +305,105 @@ TTestOneSample <- function(dataset = NULL, options, perform = "run",
 					dat <- na.omit(dataset[[ .v(variable) ]])
           n <- length(dat)
 					if (test == 2) {
+					  cohensd <- ""
+					  cohensdLowerCI <- ""
+					  cohensdUpperCI <- ""
+					  hedgesg <- ""
+					  hedgesgLowerCI <- ""
+					  hedgesgUpperCI <- ""
+					  
 						r <- stats::wilcox.test(dat, alternative = direction,
 												mu = options$testValue,
 												conf.level = percentConfidenceMeanDiff, conf.int = TRUE)
 						df <- ifelse(is.null(r$parameter), "", as.numeric(r$parameter))
 						maxw <- (n*(n+1))/2
-						d <- as.numeric((r$statistic/maxw) * 2 - 1)
+						rbc <- as.numeric((r$statistic/maxw) * 2 - 1)
 						wSE <- sqrt((n*(n+1)*(2*n+1))/6) /2
 						mrSE <- sqrt(wSE^2  * 4 * (1/maxw^2)) 
 						# zSign <- (ww$statistic - ((n*(n+1))/4))/wSE
-						zmbiss <- atanh(d)
-						d <- .clean(d)
+						zmbiss <- atanh(rbc)
+						rbc <- .clean(rbc)
 						if(direction == "two.sided") {
-						  confIntEffSize <- sort(c(tanh(zmbiss + qnorm((1-percentConfidenceEffSize)/2)*mrSE), tanh(zmbiss + qnorm((1+percentConfidenceEffSize)/2)*mrSE)))
+						  rbcConfInt <- sort(c(tanh(zmbiss + qnorm((1-percentConfidenceEffSize)/2)*mrSE), tanh(zmbiss + qnorm((1+percentConfidenceEffSize)/2)*mrSE)))
+						  rbcLowerCI <- rbcConfInt[1]
+						  rbcUpperCI <- rbcConfInt[2]
 						}else if (direction == "less") {
-						  confIntEffSize <- sort(c(-Inf, tanh(zmbiss + qnorm(percentConfidenceEffSize)*mrSE)))
+						  rbcLowerCI <- .clean(-Inf)
+						  rbcUpperCI <- tanh(zmbiss + qnorm(percentConfidenceEffSize)*mrSE)
 						}else if (direction == "greater") {
-						  confIntEffSize <- sort(c(tanh(zmbiss + qnorm((1-percentConfidenceEffSize))*mrSE), Inf))
+						  rbcLowerCI <- tanh(zmbiss + qnorm((1-percentConfidenceEffSize))*mrSE)
+						  rbcUpperCI <- .clean(Inf)
 						}
+
 					} else if(test == 3){
+					  rbc <- ""
+					  rbcLowerCI <- ""
+					  rbcUpperCI <- ""
+					  
 					  r <- BSDA::z.test(dat, alternative = direction,
 					                    mu = options$testValue, sigma.x = options$stddev,
 					                    conf.level = percentConfidenceMeanDiff)
 					  df <- ifelse(is.null(r$parameter), "", as.numeric(r$parameter))
-					  d <- .clean((mean(dat) - options$testValue) / options$stddev)
+					  Z <- as.numeric(r$statistic)
 					  
 					  if(direction == "less"){
 					    r$conf.int[1] <- -Inf
 					  } else if(direction == "greater"){
 					    r$conf.int[2] <- Inf
 					  }
-					  Z <- as.numeric(r$statistic)
-					  confIntEffSize <- c(0,0)
-					  if(wantsConfidenceEffSize){
-					    
-				      confIntEffSize <- r$conf.int/options$stddev
+					  
+					  if (direction != "two.sided") {
+					    percentConfidenceEffSize <- 1-(1-options$effSizeConfidenceIntervalPercent)*2
 					  }
+					  effectsizes <- compute.es::mes2(m.1 = mean(dat), m.2 = options$testValue, s.pooled = options$stddev, n.1 = length(dat), n.2 = length(dat), 
+					                                  level = percentConfidenceEffSize*100, dig = 15, verbose = FALSE)
+					  
+					  cohensd <- .clean(as.numeric(effectsizes["d"]))
+					  cohensdLowerCI <- .clean(as.numeric(effectsizes["l.d"]))
+					  cohensdUpperCI <- .clean(as.numeric(effectsizes["u.d"]))
+					  hedgesg <- .clean(as.numeric(effectsizes["g"]))
+					  hedgesgLowerCI <- .clean(as.numeric(effectsizes["l.g"]))
+					  hedgesgUpperCI <- .clean(as.numeric(effectsizes["u.g"]))
+					  
+					  if (direction == "greater") {
+					    cohensdUpperCI <- .clean(Inf)
+					    hedgesgUpperCI <- .clean(Inf)
+					  } else if (direction == "less") {
+					    cohensdLowerCI <- .clean(-Inf)
+					    hedgesgLowerCI <- .clean(-Inf)
+					  }
+					  
 					} else {
+					  rbc <- ""
+					  rbcLowerCI <- ""
+					  rbcUpperCI <- ""
+					  
 						r <- stats::t.test(dat, alternative = direction,
 										   mu = options$testValue, conf.level = percentConfidenceMeanDiff)
 						df <- ifelse(is.null(r$parameter), "", as.numeric(r$parameter))
-						d <- .clean((mean(dat) - options$testValue) / sd(dat))
 						t <- as.numeric(r$statistic)
-						confIntEffSize <- c(0,0)
-						if (wantsConfidenceEffSize) {
-	
-						  alphaLevels <- sort( c( (1-percentConfidenceEffSize), percentConfidenceEffSize ) )
-						  
-						  if (direction == "two.sided") {
-						    alphaLevels[1] <- (1-percentConfidenceEffSize) / 2
-						    alphaLevels[2] <- (percentConfidenceEffSize + 1) / 2
-						  } 
-						  
-						  end1 <- abs(t)
-						  while( pt(q=t,df=df,ncp=end1) > alphaLevels[1]){
-						    end1 = end1 * 2
-						  }
-						  ncp1 <- uniroot(function(x) alphaLevels[1] - pt(q=t, df=df, ncp=x),
-						                  c(2*t-end1,end1))$root
-						  
-						  end2 = -abs(t)
-						  while( pt(q=t,df=df,ncp=end2) < alphaLevels[2]){
-						    end2 = end2 * 2
-						    # end2 <- end2 - abs(t)
-						  }
-					    ncp2 <- uniroot(function(x) alphaLevels[2] - pt(q=t, df=df, ncp=x),
-					                    c(end2,2*t-end2))$root						    
-					    confIntEffSize <- sort(c(ncp1/sqrt(n), ncp2/sqrt(n)))[order(c(1-percentConfidenceEffSize, percentConfidenceEffSize ))]
-						    
-					    if (direction == "greater") {
-					      confIntEffSize[2] <- Inf
-					    } else if (direction == "less") 
-					      confIntEffSize[1] <- -Inf				
-					    
-					    confIntEffSize <- sort(confIntEffSize)
+						
+						if (direction != "two.sided") {
+						  percentConfidenceEffSize <- 1-(1-options$effSizeConfidenceIntervalPercent)*2
 						}
+						effectsizes <- compute.es::mes2(m.1 = mean(dat), m.2 = options$testValue, s.pooled = sd(dat), n.1 = length(dat), n.2 = length(dat), 
+						                                level = percentConfidenceEffSize*100, dig = 15, verbose = FALSE)
+						
+						cohensd <- .clean(as.numeric(effectsizes["d"]))
+						cohensdLowerCI <- .clean(as.numeric(effectsizes["l.d"]))
+						cohensdUpperCI <- .clean(as.numeric(effectsizes["u.d"]))
+						hedgesg <- .clean(as.numeric(effectsizes["g"]))
+						hedgesgLowerCI <- .clean(as.numeric(effectsizes["l.g"]))
+						hedgesgUpperCI <- .clean(as.numeric(effectsizes["u.g"]))
+						
+						if (direction == "greater") {
+						  cohensdUpperCI <- .clean(Inf)
+						  hedgesgUpperCI <- .clean(Inf)
+						} else if (direction == "less") {
+						  cohensdLowerCI <- .clean(-Inf)
+						  hedgesgLowerCI <- .clean(-Inf)
+						}
+						
 					}
 
 					## same for all tests
@@ -391,15 +412,15 @@ TTestOneSample <- function(dataset = NULL, options, perform = "run",
 					m <- as.numeric(r$estimate - r$null.value)
 					ciLow <- .clean(as.numeric(r$conf.int[1] - r$null.value))
 					ciUp <- .clean(as.numeric(r$conf.int[2] - r$null.value))
-          ciLowEffSize = .clean(as.numeric(confIntEffSize[1]))
-          ciUpEffSize = .clean(as.numeric(confIntEffSize[2]))
 					if (suppressWarnings(is.na(t))) { # do not throw warning when test stat is not 't' 
 						stop("data are essentially constant")
 					}
 
 					res <- list(v = variable, df = df, p = p,
-								m = m, d = d, lowerCIlocationParameter = ciLow, upperCIlocationParameter = ciUp, 
-								lowerCIeffectSize = ciLowEffSize, upperCIeffectSize = ciUpEffSize)
+								m = m, lowerCIlocationParameter = ciLow, upperCIlocationParameter = ciUp, 
+								cohensd = cohensd, cohensdLowerCI = cohensdLowerCI, cohensdUpperCI = cohensdUpperCI,
+								hedgesg = hedgesg, hedgesgLowerCI = hedgesgLowerCI, hedgesgUpperCI = hedgesgUpperCI,
+								rbc = rbc, rbcLowerCI = rbcLowerCI, rbcUpperCI = rbcUpperCI)
 					res[[testStat]] <- stat
 					if (options$VovkSellkeMPR){
 					  res[["VovkSellkeMPR"]] <- .VovkSellkeMPR(p)
@@ -419,7 +440,9 @@ TTestOneSample <- function(dataset = NULL, options, perform = "run",
 					row.footnotes <- list(t = list(index))
 
 					row <- list(v = variable, df = "", p = "", m = "",
-								lowerCI = "", upperCI = "",
+								lowerCI = "", upperCI = "", cohensd = "", cohensdLowerCI = "", cohensdUpperCI = "",
+								hedgesg = "", hedgesgLowerCI = "", hedgesgUpperCI = "",
+								rbc = "", rbcLowerCI = "", rbcUpperCI = "",
 								.footnotes = row.footnotes)
 					row[[testStat]] <- .clean(NaN)
 				}
@@ -427,7 +450,10 @@ TTestOneSample <- function(dataset = NULL, options, perform = "run",
 			## if we are not yet ready to perform, just create an empty table
 			} else {
 				row <- list(v = variable, df = ".", p = ".",
-							m = ".",  d = ".", lowerCI = ".", upperCI = ".")
+							m = ".",  d = ".", lowerCI = ".", upperCI = ".", 
+							cohensd = ".", cohensdLowerCI = ".", cohensdUpperCI = ".",
+							hedgesg = ".", hedgesgLowerCI = ".", hedgesgUpperCI = ".",
+							rbc = ".", rbcLowerCI = ".", rbcUpperCI = ".")
 				row[[testStat]] <- "."
 			}
 

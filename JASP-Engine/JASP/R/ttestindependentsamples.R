@@ -17,13 +17,14 @@
 
 TTestIndependentSamples <- function(dataset = NULL, options, perform = "run",
 									callback = function(...) 0, ...) {
-	
+  
 	state <- .retrieveState()
 	
 	## call the common initialization function
 	init <- .initializeTTest(dataset, options, perform, type = "independent-samples")
 
 	results <- init[["results"]]
+	results[[".meta"]][[2]] <- list(name = "ttest.tables", type = "object", meta=list(list(name="ttestParametric", type="table"), list(name="ttestBootstrapping", type="table")))
 	dataset <- init[["dataset"]]
 	
 	if (length(options$variables) != 0 && options$groupingVariable != '') {
@@ -33,8 +34,11 @@ TTestIndependentSamples <- function(dataset = NULL, options, perform = "run",
 	}
 
 	## call the specific independent T-Test functions
-	results[["ttest"]] <- .ttestIndependentSamplesTTest(dataset, options, perform)
 	descriptivesTable <- .ttestIndependentSamplesDescriptives(dataset, options, perform)
+	ttestParametric <- .ttestIndependentSamplesTTest(dataset, options, perform)
+	ttestBootstrapping <- .ttestIndependentSamplesTTestBootstrapping(dataset, options, perform, state)
+	results[["ttest.tables"]] <- list(ttestParametric = ttestParametric, ttestBootstrapping = ttestBootstrapping)
+	
 	levene <- .ttestIndependentSamplesInequalityOfVariances(dataset, options, perform)
 	shapiroWilk <- .ttestIndependentSamplesNormalityTest(dataset, options, perform)
 	results[["assumptionChecks"]] <- list(shapiroWilk = shapiroWilk, levene = levene, title = "Assumption Checks")
@@ -62,7 +66,7 @@ TTestIndependentSamples <- function(dataset = NULL, options, perform = "run",
 	
 	## return the results object
 	if (perform == "init") {
-		return(list(results=results, status="inited"))
+		return(list(results=results, status="inited", state = list(options = options, results = results)))
 	} else {
 		return(list(results=results, status="complete", 
 								state = list(options = options, results = results),
@@ -74,7 +78,6 @@ TTestIndependentSamples <- function(dataset = NULL, options, perform = "run",
 .ttestIndependentSamplesTTest <- function(dataset, options, perform) {
 
 	ttest <- list()
-	wantsEffect <- options$effectSize
 	wantsDifference <- options$meanDifference
 	wantsConfidenceMeanDiff <- (options$meanDiffConfidenceIntervalCheckbox &&  options$meanDifference)
 	wantsConfidenceEffSize <- (options$effSizeConfidenceIntervalCheckbox && options$effectSize)
@@ -136,15 +139,13 @@ TTestIndependentSamples <- function(dataset = NULL, options, perform = "run",
 	
 	if (!wantsWilcox) {
 	  nameOfLocationParameter <- "Mean Difference"
-	  nameOfEffectSize <- "Cohen's d"
 	} else if (wantsWilcox && onlyTest) {
 	  nameOfLocationParameter <- "Hodges-Lehmann Estimate"
-	  nameOfEffectSize <- "Rank-Biserial Correlation"
 	} else if (wantsWilcox && (wantsStudents || wantsWelchs)) {
 	  nameOfLocationParameter <-  "Location Parameter"
-	  nameOfEffectSize <-  "Effect Size"
 	}
-
+	nameOfEffectSize <-  "Effect Size"
+	
 	## add mean difference and standard error difference
 	if (wantsDifference) {
 		fields[[length(fields) + 1]] <- list(name = "md", title = nameOfLocationParameter,
@@ -180,36 +181,61 @@ TTestIndependentSamples <- function(dataset = NULL, options, perform = "run",
 	                                       overTitle = title)
 	}
 
-	## add Cohen's d
-	if (wantsEffect) {
-		fields[[length(fields) + 1]] <- list(name = "d", title = nameOfEffectSize,
-											 type = "number", format = "sf:4;dp:3")
-  	if (wantsWilcox && wantsStudents && wantsWelchs) {
-  	  .addFootnote(footnotes, symbol = "<em>Note.</em>", text = "For the Student t-test and Welch t-test, 
-  	               effect size is given by Cohen's <em>d</em>; for the Mann-Whitney test, 
-  	               effect size is given by the rank biserial correlation.")
-  	} else if (wantsWilcox && wantsStudents) {
-  	  .addFootnote(footnotes, symbol = "<em>Note.</em>", text = "For the Student t-test, 
-  	               effect size is given by Cohen's <em>d</em>; for the Mann-Whitney test, 
-  	               effect size is given by the rank biserial correlation.")
-  	} else if (wantsWilcox && wantsWelchs) {
-  	  .addFootnote(footnotes, symbol = "<em>Note.</em>", text = "For the Welch t-test, 
-  	               effect size is given by Cohen's <em>d</em>; for the Mann-Whitney test, 
-  	               effect size is given by the rank biserial correlation.")
-  	}
-	}
+	## add effect sizes
+	if (options$effectSize) {
+	  
+	  if (options$student || options$welch) {
+	    
+	    fields[[length(fields) + 1]] <- list(name = "cohensd", title = "Cohen's d",
+	                                         type = "number", format = "sf:4;dp:3")
+	    
+	    if (wantsConfidenceEffSize) {
+	      fields[[length(fields) + 1]] <- list(name = "cohensdLowerCI", type = "number",
+	                                         format = "sf:4;dp:3", title = "Lower",
+	                                         overTitle = paste0(100 * percentConfidenceEffSize, "% CI for Cohen's d"))
+	      fields[[length(fields) + 1]] <- list(name = "cohensdUpperCI", type = "number",
+	                                         format = "sf:4;dp:3", title = "Upper",
+	                                         overTitle = paste0(100 * percentConfidenceEffSize, "% CI for Cohen's d"))
+	    }
+	  
+	    fields[[length(fields) + 1]] <- list(name = "hedgesg", title = "Hedges' g",
+	                                         type = "number", format = "sf:4;dp:3")
+	    if (wantsConfidenceEffSize) {
+	      fields[[length(fields) + 1]] <- list(name = "hedgesgLowerCI", type = "number",
+	                                         format = "sf:4;dp:3", title = "Lower",
+	                                         overTitle = paste0(100 * percentConfidenceEffSize, "% CI for Hedges' g"))
+	      fields[[length(fields) + 1]] <- list(name = "hedgesgUpperCI", type = "number",
+	                                         format = "sf:4;dp:3", title = "Upper",
+	                                         overTitle = paste0(100 * percentConfidenceEffSize, "% CI for Hedges' g"))
+	    }
+	  }
+	  
+	  if (options$mannWhitneyU) {
+	    
+	    fields[[length(fields) + 1]] <- list(name = "cliffdelta", title = "Cliff delta",
+	                                         type = "number", format = "sf:4;dp:3")
+	    
+	    if (wantsConfidenceEffSize) {
+	      fields[[length(fields) + 1]] <- list(name = "cliffdeltaLowerCI", type = "number",
+	                                         format = "sf:4;dp:3", title = "Lower",
+	                                         overTitle = paste0(100 * percentConfidenceEffSize, "% CI for Cliff delta"))
+	      fields[[length(fields) + 1]] <- list(name = "cliffdeltaUpperCI", type = "number",
+	                                         format = "sf:4;dp:3", title = "Upper",
+	                                         overTitle = paste0(100 * percentConfidenceEffSize, "% CI for Cliff delta"))
+	    }
 
-	## I hope they know what they are doing! :)
-	if (wantsConfidenceEffSize) {
-		interval <- 100 * percentConfidenceEffSize
-		title <- paste0(interval, "% CI for ", nameOfEffectSize)
-
-		fields[[length(fields) + 1]] <- list(name = "lowerCIeffectSize", type = "number",
-											 format = "sf:4;dp:3", title = "Lower",
-											 overTitle = title)
-		fields[[length(fields) + 1]] <- list(name = "upperCIeffectSize", type = "number",
-											 format = "sf:4;dp:3", title = "Upper",
-											 overTitle = title)
+	    fields[[length(fields) + 1]] <- list(name = "rbc", title = "Rank biserial correlation",
+	                                         type = "number", format = "sf:4;dp:3")
+	    
+	    if (wantsConfidenceEffSize) {
+	      fields[[length(fields) + 1]] <- list(name = "rbcLowerCI", type = "number",
+	                                         format = "sf:4;dp:3", title = "Lower",
+	                                         overTitle = paste0(100 * percentConfidenceEffSize, "% CI for Rank biserial correlation"))
+	      fields[[length(fields) + 1]] <- list(name = "rbcUpperCI", type = "number",
+	                                         format = "sf:4;dp:3", title = "Upper",
+	                                         overTitle = paste0(100 * percentConfidenceEffSize, "% CI for Rank biserial correlation"))
+	    }
+	  }
 	}
 
 	## add all the fields that we may or may not have added
@@ -283,7 +309,6 @@ TTestIndependentSamples <- function(dataset = NULL, options, perform = "run",
 					## try to run the test, catching eventual errors
 					row <- try(silent = FALSE, expr = {
 
-						
 						ciEffSize <- percentConfidenceEffSize 
 						ciMeanDiff <- percentConfidenceMeanDiff
 						f <- as.formula(paste(.v(variable), "~",
@@ -304,20 +329,47 @@ TTestIndependentSamples <- function(dataset = NULL, options, perform = "run",
 													conf.int = TRUE, conf.level = ciMeanDiff, paired = FALSE)
 							df <- ""
 							sed <- ""
+							cohensd <- ""
+							cohensdLowerCI <- ""
+							cohensdUpperCI <- ""
+							hedgesg <- ""
+							hedgesgLowerCI <- ""
+							hedgesgUpperCI <- ""
+
 							stat <- as.numeric(r$statistic)
 							m <- as.numeric(r$estimate)
-							d <- abs(.clean(as.numeric(1-(2*stat)/(ns[1]*ns[2])))) * sign(m)
+							rbc <- abs(.clean(as.numeric(1-(2*stat)/(ns[1]*ns[2])))) * sign(m)
 							# rankBis <- 1 - (2*stat)/(ns[1]*ns[2])
 							wSE <- sqrt((ns[1]*ns[2] * (ns[1]+ns[2] + 1))/12)
 							rankBisSE <- sqrt(4 * 1/(ns[1]*ns[2])^2 * wSE^2)
-							zRankBis <- atanh(d)
+							zRankBis <- atanh(rbc)
 							if(direction == "two.sided") {
-							  confIntEffSize <- sort(c(tanh(zRankBis + qnorm((1-ciEffSize)/2)*rankBisSE), tanh(zRankBis + qnorm((1+ciEffSize)/2)*rankBisSE)))
+							  rbcConfInt <- sort(c(tanh(zRankBis + qnorm((1-ciEffSize)/2)*rankBisSE), tanh(zRankBis + qnorm((1+ciEffSize)/2)*rankBisSE)))
 							}else if (direction == "less") {
-							  confIntEffSize <- sort(c(-Inf, tanh(zRankBis + qnorm(ciEffSize)*rankBisSE)))
+							  rbcConfInt <- sort(c(-Inf, tanh(zRankBis + qnorm(ciEffSize)*rankBisSE)))
 							}else if (direction == "greater") {
-							  confIntEffSize <- sort(c(tanh(zRankBis + qnorm((1-ciEffSize))*rankBisSE), Inf))
+							  rbcConfInt <- sort(c(tanh(zRankBis + qnorm((1-ciEffSize))*rankBisSE), Inf))
 							}
+							rbcLowerCI <- .clean(as.numeric(rbcConfInt[1]))
+							rbcUpperCI <- .clean(as.numeric(rbcConfInt[2]))
+							
+							if (direction == "two.sided") {
+						    cliffdeltaResults <- effsize::"cliff.delta"(formula = f, data = dataset, conf.level = ciEffSize)
+						    cliffdelta <- .clean(as.numeric(cliffdeltaResults[1]$estimate))
+							  cliffdeltaLowerCI <- .clean(as.numeric(cliffdeltaResults[2]$conf.int[1]))
+							  cliffdeltaUpperCI <- .clean(as.numeric(cliffdeltaResults[2]$conf.int[2]))
+							} else if (direction == "less") {
+							  cliffdeltaResults <- effsize::"cliff.delta"(formula = f, data = dataset, conf.level = 1-(1-ciEffSize)*2)
+							  cliffdelta <- .clean(as.numeric(cliffdeltaResults[1]$estimate))
+							  cliffdeltaLowerCI <- .clean(as.numeric(-Inf))
+							  cliffdeltaUpperCI <- .clean(as.numeric(cliffdeltaResults[2]$conf.int[2]))
+							} else if (direction == "greater") {
+							  cliffdeltaResults <- effsize::"cliff.delta"(formula = f, data = dataset, conf.level = 1-(1-ciEffSize)*2)
+							  cliffdelta <- .clean(as.numeric(cliffdeltaResults[1]$estimate))
+							  cliffdeltaLowerCI <- .clean(as.numeric(cliffdeltaResults[2]$conf.int[1]))
+							  cliffdeltaUpperCI <- .clean(as.numeric(Inf))
+							}
+							
 						} else {
 							whatTest <- ifelse(test == 2, "Welch", "Student")
 							r <- stats::t.test(f, data = dataset, alternative = direction,
@@ -326,48 +378,52 @@ TTestIndependentSamples <- function(dataset = NULL, options, perform = "run",
 							df <- as.numeric(r$parameter)
 							m <- as.numeric(r$estimate[1]) - as.numeric(r$estimate[2])
 							stat <- as.numeric(r$statistic)
+
+							rbc <- ""
+							rbcLowerCI <- ""
+							rbcUpperCI <- ""
+							cliffdelta <- ""
+							cliffdeltaLowerCI <- ""
+							cliffdeltaUpperCI <- ""
 							
 							num <-  (ns[1] - 1) * sds[1]^2 + (ns[2] - 1) * sds[2]^2
-							sdPooled <- sqrt(num / (ns[1] + ns[2] - 2))
-							if(test==2){ # Use different SE when using Welch T test!
-							  sdPooled <- sqrt(((sds[1]^2)+(sds[2]^2))/2)
+							sed <-  .clean((as.numeric(r$estimate[1]) - as.numeric(r$estimate[2]))/stat)
+							
+							if (options$effectSizeSD == "effectSizeSDPooled") {
+							  sdPooled <- sqrt(num / (ns[1] + ns[2] - 2))
+							  if(test==2) { # Use different SE when using Welch T test!
+							    sdPooled <- sqrt(((sds[1]^2)+(sds[2]^2))/2)
+							  }
+							}
+							else if (options$effectSizeSD == "effectSizeSDGroup1") {
+							  sdPooled <- sds[1]
+							} else {
+							  sdPooled <- sds[2]
 							}
 							
-							d <- .clean(as.numeric((ms[1] - ms[2]) / sdPooled)) # Cohen's d
-							sed <-  .clean((as.numeric(r$estimate[1]) - as.numeric(r$estimate[2]))/stat)
-							confIntEffSize <- c(0,0)
-							if (wantsConfidenceEffSize){
-							  alphaLevels <- sort( c( (1-ciEffSize), ciEffSize ) )
-							  
-							  if (direction == "two.sided") {
-							    alphaLevels[1] <- (1-ciEffSize) / 2
-							    alphaLevels[2] <- (ciEffSize + 1) / 2
-							  } 
-							  
-							  end1 <- abs(stat)
-							  while( pt(q=stat,df=df,ncp=end1) > alphaLevels[1]){
-							    end1 = end1 * 2
-							  }
-							  ncp1 <- uniroot(function(x) alphaLevels[1] - pt(q=stat, df=df, ncp=x),
-							                  c(2*stat-end1,end1))$root
-				
-							  end2 = -abs(stat)
-							  while( pt(q=stat,df=df,ncp=end2) < alphaLevels[2]){
-							    end2 = end2 * 2
-							  }
-							  ncp2 <- uniroot(function(x) alphaLevels[2] - pt(q=stat, df=df, ncp=x),
-							                  c(end2,2*stat-end2))$root
-							  
-							  confIntEffSize = sort(c(ncp1*sqrt(1/ns[1]+1/ns[2]),  ncp2*sqrt(1/ns[1]+1/ns[2]) ))[order(c(1-ciEffSize, ciEffSize ))]
-							  if (direction == "greater") {
-							    confIntEffSize[2] <- Inf
-							  } else if (direction == "less") 
-							    confIntEffSize[1] <- -Inf
-							  
-							  confIntEffSize <- sort(confIntEffSize)
+							if (direction != "two.sided") {
+							  ciEffSize <- 1-(1-ciEffSize)*2
+							}
+							
+							effectsizes <- compute.es::mes2(m.1 = ms[1], m.2 = ms[2], s.pooled = sdPooled, n.1 = ns[1], n.2 = ns[2], 
+							                                level = ciEffSize*100, dig = 15, verbose = FALSE)
+							
+							cohensd <- .clean(as.numeric(effectsizes["d"]))
+							cohensdLowerCI <- .clean(as.numeric(effectsizes["l.d"]))
+							cohensdUpperCI <- .clean(as.numeric(effectsizes["u.d"]))
+							hedgesg <- .clean(as.numeric(effectsizes["g"]))
+							hedgesgLowerCI <- .clean(as.numeric(effectsizes["l.g"]))
+							hedgesgUpperCI <- .clean(as.numeric(effectsizes["u.g"]))
+						
+							if (direction == "greater") {
+							  cohensdUpperCI <- Inf
+							  hedgesgUpperCI <- Inf
+							} else if (direction == "less") {
+							  cohensdLowerCI <- -Inf
+							  hedgesgLowerCI <- -Inf
 							}
 						}
-
+							  
 						## if the user doesn't want a Welch's t-test,
 						## give a footnote indicating if the equality of variance
 						## assumption is met; seems like in this setting there is no
@@ -389,13 +445,15 @@ TTestIndependentSamples <- function(dataset = NULL, options, perform = "run",
 
 						ciLow <- .clean(r$conf.int[1])
 						ciUp <- .clean(r$conf.int[2])
-						lowerCIeffectSize <- .clean(as.numeric(confIntEffSize[1]))
-						upperCIeffectSize <- .clean(as.numeric(confIntEffSize[2]))
+						
 						# this will be the results object
 						res <- list(v = variable, test = whatTest, df = df, p = p,
-												md = m, d = d, lowerCIlocationParameter = ciLow, upperCIlocationParameter = ciUp,
-												lowerCIeffectSize = lowerCIeffectSize, upperCIeffectSize = upperCIeffectSize,
-												sed = sed, .footnotes = row.footnotes)
+												md = m, sed = sed, lowerCIlocationParameter = ciLow, upperCIlocationParameter = ciUp,
+												cohensd = cohensd, cohensdLowerCI = cohensdLowerCI, cohensdUpperCI = cohensdUpperCI,
+												hedgesg = hedgesg, hedgesgLowerCI = hedgesgLowerCI, hedgesgUpperCI = hedgesgUpperCI,
+												cliffdelta = cliffdelta, cliffdeltaLowerCI = cliffdeltaLowerCI, cliffdeltaUpperCI = cliffdeltaUpperCI,
+												rbc = rbc, rbcLowerCI = rbcLowerCI, rbcUpperCI = rbcUpperCI,
+												.footnotes = row.footnotes)
 						res[[testStat]] <- stat
 						if (options$VovkSellkeMPR){
 							res[["VovkSellkeMPR"]] <- .VovkSellkeMPR(p)
@@ -415,9 +473,12 @@ TTestIndependentSamples <- function(dataset = NULL, options, perform = "run",
 					row.footnotes <- list(t = list(index))
 
 					row <- list(v = variable, test = "", df = "", p = "",
-								md = "", d = "", lowerCIlocationParameter = "", upperCIlocationParameter = "",
-								lowerCIeffectSize = "", upperCIeffectSize = "",
-								sed = "", .footnotes = list(t = list(index)))
+								md = "", sed = "", lowerCIlocationParameter = "", upperCIlocationParameter = "",
+								cohensd = "", cohensdLowerCI = "", cohensdUpperCI = "",
+								hedgesg = "", hedgesgLowerCI = "", hedgesgUpperCI = "",
+								cliffdelta = "", cliffdeltaLowerCI = "", cliffdeltaUpperCI = "",
+								rbc = "", rbcLowerCI = "", rbcUpperCI = "",
+								.footnotes = list(t = list(index)))
 					row[[testStat]] <- .clean(NaN)
 				}
 				## if the user only wants more than one test
@@ -434,7 +495,99 @@ TTestIndependentSamples <- function(dataset = NULL, options, perform = "run",
 	}
 
 	ttest[["data"]] <- ttest.rows
-	ttest
+
+	return(ttest)
+	  
+}
+
+
+.ttestIndependentSamplesTTestBootstrapping <- function(dataset, options, perform, state) {
+  
+  if (options$bootstrapping == FALSE) { return(NULL) }
+
+  # Check whether state can be used
+  diff <- NULL
+  if (! is.null(state$options)) {
+    diff <- .diff(options, state$options)
+  }
+  
+  if (is.null(diff) || (diff[['variables']] == FALSE && diff[['bootstrapping']] == FALSE &&
+    diff[['groupingVariable']] == FALSE && diff[['missingValues']] == FALSE && 
+    diff[['bootstrappingReplicates']] == FALSE && diff[['hypothesis']] == FALSE )) {
+
+    if (! is.null(state) && state$results$ttest.tables$ttestBootstrapping$status != "initiated") {
+      return(state$results$ttest.tables$ttestBootstrapping)
+    }
+  }
+  
+  ttest.boots <- list()
+  ttest.boots["title"] <- "Independent Samples T-Test with Bootstrapping"
+  fields <- list(list(name = "v", title = "", type = "string", combine = TRUE),
+                 list(name= "md", title = "Mean Difference", type="number", format="sf:4;dp:3"),
+                 list(name = "bias", title="Bias", type="number", format="sf:4;dp:3"),
+                 list(name = "se", title="SE", type="number", format="sf:4;dp:3"),
+                 list(name="lowerCIBoots", title ="Lower", type="number", format="sf:4;dp:3", overTitle="95 % CI"),
+                 list(name="upperCIBoots", title ="Upper", type="number", format="sf:4;dp:3", overTitle="95 % CI"))
+  ttest.boots[["schema"]] <- list(fields = fields)
+  rows <- list()
+  
+  for (variable in options$variables) {
+      
+    row <- list("v"=variable, "md" = ".", "bias" = ".", "se" = ".", "lowerCIBoots" = ".", "upperCIBoots" = ".")
+      
+    if (perform == "run") {
+        
+      dataset[[.v(options$groupingVariable)]] <- relevel(dataset[[.v(options$groupingVariable)]], ref = 2)
+      model.formula <- paste0(.v(variable), " ~ ", .v(options$groupingVariable))
+      
+      .bootstrapping <- function(data, indices, formula) {
+        d <- data[indices, , drop = FALSE] # allows boot to select sample
+        fit <- lm(formula = formula, data=d)
+        return(coef(fit))
+      }
+      
+      bootstrap.summary <- boot::boot(data = dataset, statistic = .bootstrapping, R = options$bootstrappingReplicates, formula = model.formula)
+      bootstrap.md <- bootstrap.summary$t0
+      bootstrap.bias <- colMeans(bootstrap.summary$t, na.rm = TRUE) - bootstrap.md
+      bootstrap.se <- matrixStats::colSds(bootstrap.summary$t, na.rm = TRUE)
+      
+      row[["md"]] <- as.numeric(bootstrap.md[2])
+      row[["bias"]] <- as.numeric(bootstrap.bias[2])
+      row[["se"]] <- as.numeric(bootstrap.se[2])
+      if (options$hypothesis == "groupsNotEqual") {
+        bootstrap.ci <- boot::boot.ci(bootstrap.summary, type="bca", conf = 0.95, index=2)
+        row[["lowerCIBoots"]] <- as.numeric( bootstrap.ci$bca[4] )
+        row[["upperCIBoots"]] <- as.numeric( bootstrap.ci$bca[5] )
+      } else {
+        bootstrap.ci <- boot::boot.ci(bootstrap.summary, type="bca", conf = 0.90, index=2)
+        if (options$hypothesis == "groupOneGreater") {
+          row[["lowerCIBoots"]] <- as.numeric( bootstrap.ci$bca[4] )
+          row[["upperCIBoots"]] <- .clean(Inf)
+        } else if (options$hypothesis == "groupTwoGreater") {
+          row[["lowerCIBoots"]] <- .clean(-Inf)
+          row[["upperCIBoots"]] <- as.numeric( bootstrap.ci$bca[5] )
+        }
+      }
+
+      if(length(rows) == 0)  {
+        row[[".isNewGroup"]] <- TRUE
+      } else {
+        row[[".isNewGroup"]] <- FALSE
+      }
+    }
+    
+    rows[[length(rows)+1]] <- row
+  }
+  
+  if (perform == "init") {
+    ttest.boots[["status"]] <- "initiated"
+  } else {
+    ttest.boots[["status"]] <- "complete"
+  }
+  ttest.boots[["data"]] <- rows
+
+  return(ttest.boots)
+
 }
 
 

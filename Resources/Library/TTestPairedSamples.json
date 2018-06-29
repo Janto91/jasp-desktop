@@ -60,6 +60,12 @@
 			"name": "effectSize",
 			"type": "Boolean"
 		},
+        {
+            "name": "effectSizeSD",
+            "options": [ "effectSizeSDDifference", "effectSizeSDTime1" ],
+            "default": "effectSizeSDDifference",
+            "type": "List"
+        },
 		{
 			"name": "missingValues",
 			"options": [ "excludeAnalysisByAnalysis", "excludeListwise" ],

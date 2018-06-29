@@ -161,13 +161,8 @@ AnovaRepeatedMeasuresForm::AnovaRepeatedMeasuresForm(QWidget *parent) :
 
 	connect(_designTableModel, SIGNAL(designChanged()), this, SLOT(withinSubjectsDesignChanged()));
 
-#ifndef JASP_DEBUG
-	ui->groupCompareMainEffects->hide();
+    termsChanged();
 
-#else
-	ui->groupCompareMainEffects->setStyleSheet("background-color: pink ;");
-
-#endif
 }
 
 AnovaRepeatedMeasuresForm::~AnovaRepeatedMeasuresForm()
@@ -190,6 +185,7 @@ void AnovaRepeatedMeasuresForm::bindTo(Options *options, DataSet *dataSet)
 		_withinSubjectsTermsModel->addFixedFactors(factors);
 
 	_betweenSubjectsTermsModel->setVariables(_betweenSubjectsFactorsListModel->assigned());
+    termsChanged();
 }
 
 void AnovaRepeatedMeasuresForm::factorsChanging()
@@ -241,8 +237,6 @@ void AnovaRepeatedMeasuresForm::factorsChanged(bool changed)
 void AnovaRepeatedMeasuresForm::termsChanged()
 {
 	Terms terms;
-
-	terms.add(string("~OVERALL"));
 
 	foreach (const Factor &factor, _designTableModel->design())
 		terms.add(factor.first);
