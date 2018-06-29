@@ -655,9 +655,8 @@ AnovaRepeatedMeasures <- function(dataset=NULL, options, perform="run", callback
 	termsRM.normal <- modelDef$termsRM.normal
 
 	epsilonTable <- NULL
-
-	epsilonTable <- as.data.frame(matrix(0, length(termsRM.base64), 7))
-	colnames(epsilonTable) <- c("W", "p", "GG", "HF", "LB", "twoLevels", "termsNormal")
+	epsilonTable <- as.data.frame(matrix(0, length(termsRM.base64), 9))
+	colnames(epsilonTable) <- c("W", "Chi", "df", "p", "GG", "HF", "LB", "twoLevels", "termsNormal")
 
 
 	rownames(epsilonTable) <- termsRM.base64
@@ -676,6 +675,8 @@ AnovaRepeatedMeasures <- function(dataset=NULL, options, perform="run", callback
 		if (sum(index) == 0 ) {
 
 			epsilonTable[i,"W"] <- 1
+			epsilonTable[i,"Chi"] <- NaN
+			epsilonTable[i,"df"] <- NaN
 			epsilonTable[i,"p"] <- NaN
 			epsilonTable[i,"GG"] <- 1
 			epsilonTable[i,"HF"] <- 1
@@ -685,6 +686,8 @@ AnovaRepeatedMeasures <- function(dataset=NULL, options, perform="run", callback
 		} else if (is.na(epsilon[1])) {
 		  
 		  epsilonTable[i,"W"] <- NaN
+		  epsilonTable[i,"Chi"] <- NaN
+		  epsilonTable[i,"df"] <- NaN
 		  epsilonTable[i,"p"] <- NaN
 		  epsilonTable[i,"GG"] <- NaN
 		  epsilonTable[i,"HF"] <- NaN
@@ -694,24 +697,27 @@ AnovaRepeatedMeasures <- function(dataset=NULL, options, perform="run", callback
 		} else {
 
 			HF <- epsilon[index, "HF eps"]
-			LBDenominator <- 1
-
-			if (HF > 1)
+			if (HF > 1) {
 				HF <- 1
-
-			epsilonTable[i,"W"] <- mauchly[index,"Test statistic"]
-			epsilonTable[i,"p"] <- mauchly[index,"p-value"]
-			epsilonTable[i,"GG"] <- epsilon[index, "GG eps"]
-			epsilonTable[i,"HF"] <- HF
+			}
 			
+			Levels <- 1
+			LBDenominator <- 1
 			for (j in 1:length(modelTermsCase)) {
 			  for (k in 1:length(options$repeatedMeasuresFactors)) {
 			    if (modelTermsCase[[j]] == .v(options$repeatedMeasuresFactors[[k]]$name)) {
-			        LBDenominator <- LBDenominator*(length(options$repeatedMeasuresFactors[[k]]$levels) - 1)
-			      }
+			      Levels <- Levels*length(options$repeatedMeasuresFactors[[k]]$levels)
+			      LBDenominator <- LBDenominator*(length(options$repeatedMeasuresFactors[[k]]$levels) - 1)
+			    }
 			  }
 			}
 			
+			epsilonTable[i,"W"] <- mauchly[index,"Test statistic"]
+			epsilonTable[i,"df"] <- choose(Levels, 2) - 1
+			epsilonTable[i,"p"] <- mauchly[index,"p-value"]
+			epsilonTable[i,"Chi"] <- qchisq(1-epsilonTable[i,"p"], df=epsilonTable[i,"df"]) 
+			epsilonTable[i,"GG"] <- epsilon[index, "GG eps"]
+			epsilonTable[i,"HF"] <- HF
 			epsilonTable[i,"LB"] <- 1 / LBDenominator
 			epsilonTable[i,"twoLevels"] <- FALSE
 
@@ -1921,6 +1927,8 @@ AnovaRepeatedMeasures <- function(dataset=NULL, options, perform="run", callback
 		fields <- list(
 			list(name="case", type="string", title=""),
 			list(name="W", type="number", format="sf:4;dp:3", title="Mauchly's W"),
+			list(name="Chi", type="number", format="sf:4;dp:3", title="Approx. \u03A7\u00B2"),
+			list(name="df", type="number", format="sf:4;dp:3"),
 			list(name="p", type="number", format="dp:3;p:.001"),
 			list(name = "VovkSellkeMPR", title = "VS-MPR", type = "number", format = "sf:4;dp:3"),
 			list(name="GG", type="number", format="sf:4;dp:3", title="Greenhouse-Geisser \u03B5"),
@@ -1930,6 +1938,8 @@ AnovaRepeatedMeasures <- function(dataset=NULL, options, perform="run", callback
 		 fields <- list(
 			 list(name="case", type="string", title=""),
 			 list(name="W", type="number", format="sf:4;dp:3", title="Mauchly's W"),
+			 list(name="Chi", type="number", format="sf:4;dp:3", title="Approx. \u03A7\u00B2"),
+			 list(name="df", type="number", format="sf:4;dp:3"),
 			 list(name="p", type="number", format="dp:3;p:.001"),
 			 list(name="GG", type="number", format="sf:4;dp:3", title="Greenhouse-Geisser \u03B5"),
 			 list(name="HF", type="number", format="sf:4;dp:3", title="Huynh-Feldt \u03B5"),
@@ -1956,7 +1966,7 @@ AnovaRepeatedMeasures <- function(dataset=NULL, options, perform="run", callback
 				newGroup <- FALSE
 			}
 
-			row <- list("case"=termsRM.normal[[i]], "W"=".", "p"=".", "GG"=".", "HF"=".", "LB" = ".", ".isNewGroup" = newGroup)
+			row <- list("case"=termsRM.normal[[i]], "W"=".", "Chi"=".", "df"=".", "p"=".", "GG"=".", "HF"=".", "LB" = ".", ".isNewGroup" = newGroup)
 			sphericity.rows[[length(sphericity.rows) + 1]] <- row
 
 		}
@@ -1990,8 +2000,10 @@ AnovaRepeatedMeasures <- function(dataset=NULL, options, perform="run", callback
 			}
 
 
-			row <- list("case"=stateSphericity$termsNormal[i], "W"=stateSphericity$W[i], "p"=.clean(stateSphericity$p[i]), "GG"=stateSphericity$GG[i],
-						"HF"=stateSphericity$HF[i], "LB"=stateSphericity$LB[i], ".isNewGroup" = newGroup, .footnotes=row.footnotes)
+			row <- list("case"=stateSphericity$termsNormal[i], "Chi"=stateSphericity$Chi[i], "df"=stateSphericity$df[i],
+			            "W"=stateSphericity$W[i], "p"=.clean(stateSphericity$p[i]), "GG"=stateSphericity$GG[i],
+			            "HF"=stateSphericity$HF[i], "LB"=stateSphericity$LB[i], ".isNewGroup" = newGroup, 
+			            .footnotes=row.footnotes)
 
 			if (options$VovkSellkeMPR){
 			  row[["VovkSellkeMPR"]] <- .VovkSellkeMPR(row[["p"]])
