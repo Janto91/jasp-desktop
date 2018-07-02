@@ -3854,7 +3854,7 @@ AnovaRepeatedMeasures <- function(dataset=NULL, options, perform="run", callback
         bootstrap.se <- matrixStats::colSds(bootstrap.summary$t, na.rm = TRUE)
         bootstrap.md <- bootstrap.md[[index]]
         bootstrap.bias <- bootstrap.bias[[index]]
-        #bootstrap.se <- bootstrap.se[[index]]
+        bootstrap.se <- bootstrap.se[[index]]
         bootstrap.ci <- boot::boot.ci(bootstrap.summary, type="bca", conf = 0.95, index=index)
         bootstrap.lower <- as.numeric( bootstrap.ci$bca[4] )
         bootstrap.upper <- as.numeric( bootstrap.ci$bca[5] )
