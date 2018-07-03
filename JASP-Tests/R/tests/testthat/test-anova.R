@@ -305,22 +305,29 @@ test_that("Fields Book - Chapter 4 results match", {
     list(components="Dose")
   )
   options$descriptives <- TRUE
+  options$plotHorizontalAxis <- "Dose"
+  options$plotErrorBars <- TRUE
+  options$errorBarType <- "confidenceInterval"
   options$postHocTestsVariables <- "Dose"
   options$postHocTestEffectSize <- TRUE
   results <- jasptools::run("Anova", dataset = rio::import("~/Dropbox/ej_andy_shared/spss_tutorials/spss_glm_04/www/Puppies Dummy.sav"), options, view=FALSE, quiet=TRUE)
   tableOutput2 <- results[["results"]][["descriptivesObj"]][["descriptivesTable"]][["data"]]
-  tableOutput3 <- results[["results"]][["anova"]][["data"]]
-  cohensdPuppiesOutput <- list(results[["results"]][["posthoc"]][["collection"]][[1]][["data"]][[1]][["Cohen's d"]], results[["results"]][["posthoc"]][["collection"]][[1]][["data"]][[2]][["Cohen's d"]], results[["results"]][["posthoc"]][["collection"]][[1]][["data"]][[3]][["Cohen's d"]]) 
   expect_equal_tables(tableOutput2,
                       list(1, 5, 2.2, 1.30384, "TRUE",
                            2, 5, 3.2, 1.30384, "FALSE",
                            3, 5, 5, 1.581139, "FALSE")
   )
+  figure3 <- results[["state"]][["figures"]][[1]] # Q-Q-Plot
+  #expect_equal_plots(figure3, "?", dir="Anova") # This command needs to be updated
+  
+  tableOutput3 <- results[["results"]][["anova"]][["data"]]
   expect_equal_tables(tableOutput3,
                       list("Dose", 20.13333, 2, 10.06667, 5.118644, 0.02469429, "TRUE",
                            "Residual", 23.6, 12, 1.966667, "", "", "TRUE")
   )
   # Insert test for Welch and the Brown-Forsythe F-statistics (Output 4)
+  
+  cohensdPuppiesOutput <- list(results[["results"]][["posthoc"]][["collection"]][[1]][["data"]][[1]][["Cohen's d"]], results[["results"]][["posthoc"]][["collection"]][[1]][["data"]][[2]][["Cohen's d"]], results[["results"]][["posthoc"]][["collection"]][[1]][["data"]][[3]][["Cohen's d"]]) 
   expect_equal_tables(cohensdPuppiesOutput,
                       list(-0.766965, -1.932184, -1.242118)
   )
@@ -357,11 +364,11 @@ test_that("Fields Book - Chapter 5 results match", {
   options$postHocTestsVariables <- c("Dose")
   results <- jasptools::run("Anova", dataset = rio::import("~/Dropbox/ej_andy_shared/spss_tutorials/spss_glm_04/www/Puppies Dummy.sav"), options, view=FALSE, quiet=TRUE)
   tableOutput5 <- results[["results"]][["contrasts"]][["collection"]][[1]][["data"]]
-  tableOutput6 <- results[["results"]][["posthoc"]][["collection"]][[1]][["data"]]
   expect_equal_tables(tableOutput5,
                       list("1 - 2, 3", -1.9, 0.7681146, -2.473589, 0.02930022, "TRUE",
                            "2 - 3", -1.8, 0.8869423, -2.029444, 0.06519221, "FALSE")
   )
+  tableOutput6 <- results[["results"]][["posthoc"]][["collection"]][[1]][["data"]]
   expect_equal_tables(tableOutput6,
                       list(1, 2, -1, 0.8869423, -1.127469, "", 0.5163208, "", "", "", "", "TRUE",
                            1, 3, -2.8, 0.8869423, -3.156913, "", 0.02097356, "", "", "", "", "FALSE",

@@ -347,17 +347,16 @@ test_that("Fields Book - Chapter 1 results match", {
   )
   results <- jasptools::run("RegressionLinear", dataset = read.csv("~/Documents/GitHub/JASP/jasp-desktop/Resources/Data Sets/Data Library/Books/Field -  Discovering Statistics/Album Sales.csv", header = T), options, view=FALSE, quiet=TRUE)
   tableOutput1 <- results[["results"]][["model summary"]][["data"]]
-  tableOutput2 <- results[["results"]][["anova"]][["data"]]
-  tableOutput3 <- results[["results"]][["regression"]][["data"]]
-
   expect_equal_tables(tableOutput1,
                       list(1, 0.5784877, 0.3346481, 0.3312877, 65.99144)
   )
+  tableOutput2 <- results[["results"]][["anova"]][["data"]]
   expect_equal_tables(tableOutput2,
                       list(1, "Regression", 433687.8, 1, 433687.8, 99.58687, 2.94198e-19, "TRUE", 
                            "", "Residual", 862264.2, 198, 4354.87, "", "",
                            "", "Total", 1295952, 199, "", "", "")
   )
+  tableOutput3 <- results[["results"]][["regression"]][["data"]]
   expect_equal_tables(tableOutput3,
                       list(1, "(Intercept)", 134.1399, 7.536575, "", 17.79853, 5.967817e-43, "TRUE",
                            "", "adverts", 0.09612449, 0.009632366, 0.5784877, 9.979322, 2.94198e-19)
@@ -371,13 +370,11 @@ test_that("Fields Book - Chapter 1 results match", {
   )
   results <- jasptools::run("RegressionLinear", dataset = read.csv("~/Documents/GitHub/JASP/jasp-desktop/Resources/Data Sets/Data Library/Books/Field -  Discovering Statistics/Album Sales.csv", header = T), options, view=FALSE, quiet=TRUE)
   tableOutput4 <- results[["results"]][["model summary"]][["data"]]
-  tableOutput5 <- results[["results"]][["anova"]][["data"]]
-  tableOutput6 <- results[["results"]][["regression"]][["data"]]
-  
   expect_equal_tables(tableOutput4,
                       list(0, 0.5784877, 0.3346481, 0.3312877, 65.99144,
                            1, 0.8152715, 0.6646677, 0.659535, 47.08734)
   )
+  tableOutput5 <- results[["results"]][["anova"]][["data"]]
   expect_equal_tables(tableOutput5,
                       list(0, "Regression", 433687.8, 1, 433687.8, 99.58687, 2.94198e-19, "TRUE", 
                            "", "Residual", 862264.2, 198, 4354.87, "", "",
@@ -386,6 +383,7 @@ test_that("Fields Book - Chapter 1 results match", {
                            "", "Residual", 434574.6, 196, 2217.217, "", "",
                            "", "Total", 1295952, 199, "", "", "")
   )
+  tableOutput6 <- results[["results"]][["regression"]][["data"]]
   expect_equal_tables(tableOutput6,
                       list(0, "(Intercept)", 134.1399, 7.536575, "", 17.79853, 5.967817e-43, "TRUE",
                            "", "adverts", 0.09612449, 0.009632366, 0.5784877, 9.979322, 2.94198e-19,
@@ -408,15 +406,13 @@ test_that("Fields Book - Chapter 2 results match", {
   )
   options$rSquaredChange <- TRUE
   options$regressionCoefficientsConfidenceIntervals <- TRUE
-  
   results <- jasptools::run("RegressionLinear", dataset = read.csv("~/Documents/GitHub/JASP/jasp-desktop/Resources/Data Sets/Data Library/Books/Field -  Discovering Statistics/Album Sales.csv", header = T), options, view=FALSE, quiet=TRUE)
   tableOutput4 <- results[["results"]][["model summary"]][["data"]]
-  tableOutput6 <- results[["results"]][["regression"]][["data"]]
-  
   expect_equal_tables(tableOutput4,
                       list(0, 0.5784877, 0.3346481, 0.3312877, 65.99144, 0.3346481, 99.58687, 1, 198, 2.94198e-19,
                            1, 0.8152715, 0.6646677, 0.659535, 47.08734, 0.3300196, 96.44738, 2, 196, 6.879395e-30)
   )
+  tableOutput6 <- results[["results"]][["regression"]][["data"]]
   expect_equal_tables(tableOutput6,
                       list(0, "(Intercept)", 134.1399, 7.536575, "", 17.79853, 5.967817e-43, 119.2777, 149.0022, "TRUE",
                            "", "adverts", 0.09612449, 0.009632366, 0.5784877, 9.979322, 2.94198e-19, 0.07712929, 0.1151197,
@@ -430,21 +426,35 @@ test_that("Fields Book - Chapter 2 results match", {
 # Chapter 3
 test_that("Fields Book - Chapter 3 results match", {
   options <- jasptools::analysisOptions("RegressionLinear")
-  options$dependent <- "sales"
-  options$covariates <- c("adverts", "airplay", "attract")
+  options$dependent <- "Sales"
+  options$covariates <- c("Adverts", "Airplay", "Image")
   options$modelTerms <- list(
-    list(components="adverts", isNuisance=TRUE),
-    list(components="airplay", isNuisance=FALSE),
-    list(components="attract", isNuisance=FALSE)
+    list(components="Adverts", isNuisance=TRUE),
+    list(components="Airplay", isNuisance=FALSE),
+    list(components="Image", isNuisance=FALSE)
   )
+  options$plotResidualsPredicted <- TRUE
+  options$plotsPartialRegression <- TRUE
+  options$plotResidualsHistogram <- TRUE
+  options$plotResidualsHistogramStandardized <- TRUE
+  options$plotResidualsQQ <- TRUE
   options$residualsCasewiseDiagnostics <- TRUE
   options$residualsCasewiseDiagnosticsType <- "outliersOutside"
   options$residualsCasewiseDiagnosticsOutliersOutside <- 2
-  options$regressionCoefficientsBootstrapping <- TRUE
-  options$regressionCoefficientsBootstrappingReplicates <- 1000
-  set.seed(1) # For Bootstrapping Unit Tests
   options$regressionCoefficientsConfidenceIntervals <- TRUE
-  results <- jasptools::run("RegressionLinear", dataset = read.csv("~/Documents/GitHub/JASP/jasp-desktop/Resources/Data Sets/Data Library/Books/Field -  Discovering Statistics/Album Sales.csv", header = T), options, view=FALSE, quiet=TRUE)
+  results <- jasptools::run("RegressionLinear", dataset = rio::import("~/Dropbox/ej_andy_shared/spss_tutorials/spss_glm_03/www/Album Sales.sav"), options, view=FALSE, quiet=TRUE)
+  figure3 <- results[["state"]][["figures"]][[1]] # Residuals vs. Predicted
+  #expect_equal_plots(figure3, "?", dir="RegressionLinear") # This command needs to be updated
+  figure4a <- results[["state"]][["figures"]][[4]] # Partial Plot Adverts
+  #expect_equal_plots(figure4a, "?", dir="RegressionLinear") # This command needs to be updated
+  figure4b <- results[["state"]][["figures"]][[5]] # Partial Plot Airplay
+  #expect_equal_plots(figure4b, "?", dir="RegressionLinear") # This command needs to be updated
+  figure4c <- results[["state"]][["figures"]][[6]] # Partial Plot Image
+  #expect_equal_plots(figure4c, "?", dir="RegressionLinear") # This command needs to be updated
+  figure5a <- results[["state"]][["figures"]][[2]] # Standardized Residuals Histogram
+  #expect_equal_plots(figure5a, "?", dir="RegressionLinear") # This command needs to be updated
+  figure5b <- results[["state"]][["figures"]][[3]] # Q-Q-Plot
+  #expect_equal_plots(figure5b, "?", dir="RegressionLinear") # This command needs to be updated
   tableOutput1 <- results[["results"]][["casewise diagnostics"]][["data"]]
   expect_equal_tables(tableOutput1,
                       list(1, 2.177404, 330, 229.9203, 100.0797, 0.05870388, 
@@ -460,6 +470,36 @@ test_that("Fields Book - Chapter 3 results match", {
                            169, 3.093333, 360, 215.8675, 144.1325, 0.050867,
                            200, -2.088044, 110, 207.2061, -97.20606, 0.02513455)
   )
+  
+  options <- jasptools::analysisOptions("RegressionLinear")
+  options$dependent <- "Sales"
+  options$covariates <- c("Adverts", "Airplay", "Image")
+  options$modelTerms <- list(
+    list(components="Adverts", isNuisance=TRUE),
+    list(components="Airplay", isNuisance=FALSE),
+    list(components="Image", isNuisance=FALSE)
+  )
+  options$residualsCasewiseDiagnostics <- TRUE
+  options$residualsCasewiseDiagnosticsType <- "allCases"
+  options$regressionCoefficientsBootstrapping <- TRUE
+  options$regressionCoefficientsBootstrappingReplicates <- 1000
+  set.seed(1) # For Bootstrapping Unit Tests
+  options$regressionCoefficientsConfidenceIntervals <- TRUE
+  results <- jasptools::run("RegressionLinear", dataset = rio::import("~/Dropbox/ej_andy_shared/spss_tutorials/spss_glm_03/www/Album Sales.sav"), options, view=FALSE, quiet=TRUE)
+  figure10 <- results[["results"]][["casewise diagnostics"]][["data"]]
+  figure10 <- list(figure10[[1]]$cooksD, figure10[[2]]$cooksD, figure10[[3]]$cooksD, figure10[[4]]$cooksD,
+                   figure10[[5]]$cooksD, figure10[[6]]$cooksD, figure10[[7]]$cooksD, figure10[[8]]$cooksD,
+                   figure10[[9]]$cooksD, figure10[[10]]$cooksD, figure10[[11]]$cooksD, figure10[[12]]$cooksD,
+                   figure10[[13]]$cooksD, figure10[[14]]$cooksD, figure10[[15]]$cooksD, figure10[[16]]$cooksD,
+                   figure10[[17]]$cooksD, figure10[[18]]$cooksD, figure10[[19]]$cooksD, figure10[[20]]$cooksD,
+                   figure10[[21]]$cooksD, figure10[[22]]$cooksD)
+  expect_equal_tables(figure10,
+                      list(0.05870388, 0.01088943, 0.01140066, 7.166478e-05, 0.0001025423, 
+                           0.001377347, 0.00594368, 0.0007230228, 0.0009490373, 0.01775647,
+                           0.000822629, 0.01657069, 0.0003049181, 0.0003904011, 0.004041096,
+                           0.002207233, 0.0002713418, 0.0001776211, 0.0004687904, 0.008795957,
+                           0.0002810147, 0.0002291055)
+  )
   tableOutput2 <- results[["results"]][["bootstrap.regression"]][["data"]]
   expect_equal_tables(tableOutput2,
                       list(0, "(Intercept)", -0.08265759, 134.1399, 8.228444, 118.874, 151.0766, "TRUE", 
@@ -469,6 +509,26 @@ test_that("Fields Book - Chapter 3 results match", {
                            "", "airplay", 0.0128862, 3.367425, 0.3070985, 2.732326, 3.918479,
                            "", "attract", -0.2110928, 11.08634, 2.234141, 6.502079, 15.13605)
   )
+  
+  options <- jasptools::analysisOptions("RegressionLinear")
+  options$dependent <- "spai"
+  options$covariates <- c("tosca", "obq")
+  options$modelTerms <- list(
+    list(components="tosca", isNuisance=TRUE),
+    list(components="obq", isNuisance=FALSE)
+  )
+  options$plotResidualsPredicted <- TRUE
+  options$plotsPartialRegression <- TRUE
+  options$plotResidualsQQ <- TRUE
+  results <- jasptools::run("RegressionLinear", dataset = rio::import("~/Dropbox/ej_andy_shared/spss_tutorials/spss_glm_03/www/SocialAnxietyRegression.sav"), options, view=FALSE, quiet=TRUE)
+  figure11a <- results[["state"]][["figures"]][[1]] # Residuals vs. Predicted
+  #expect_equal_plots(figure11a, "?", dir="RegressionLinear") # This command needs to be updated
+  figure11b <- results[["state"]][["figures"]][[3]] # Partial Plot Adverts
+  #expect_equal_plots(figure11b, "?", dir="RegressionLinear") # This command needs to be updated
+  figure11c <- results[["state"]][["figures"]][[4]] # Partial Plot Airplay
+  #expect_equal_plots(figure11c, "?", dir="RegressionLinear") # This command needs to be updated
+  figure11d <- results[["state"]][["figures"]][[2]] # Q-Q-Plot
+  #expect_equal_plots(figure11d, "?", dir="RegressionLinear") # This command needs to be updated
 })
 
 
@@ -484,12 +544,12 @@ test_that("Fields Book - Chapter 4 results match", {
   options$regressionCoefficientsConfidenceIntervals <- TRUE
   results <- jasptools::run("RegressionLinear", dataset = rio::import("~/Dropbox/ej_andy_shared/spss_tutorials/spss_glm_04/www/Puppies Dummy.sav"), options, view=FALSE, quiet=TRUE)
   tableOutput1a <- results[["results"]][["anova"]][["data"]]
-  tableOutput1b <- results[["results"]][["regression"]][["data"]]
   expect_equal_tables(tableOutput1a,
                       list(1, "Regression", 20.13333, 2, 10.06667, 5.118644, 0.02469429, "TRUE",
                            "", "Residual", 23.6, 12, 1.966667, "", "",
                            "", "Total", 43.73333, 14, "", "", "")
   )
+  tableOutput1b <- results[["results"]][["regression"]][["data"]]
   expect_equal_tables(tableOutput1b,
                       list(1, "(Intercept)", 2.2, 0.6271629, "", 3.50786, 0.00431889, 0.8335294, 3.566471, "TRUE",
                            "", "dummy1", 2.8, 0.8869423, 0.7730207, 3.156913, 0.008268103, 0.8675187, 4.732481,

@@ -267,6 +267,21 @@ test_that("Analysis handles errors", {
 
 # Below are the unit tests for Andy Field's book
 
+# Chapter 1
+#test_that("Fields Book - Chapter 6 results match", {
+  #options <- jasptools::analysisOptions("Ancova")
+  #options$dependent <- "Sales"
+  #options$covariates <- "Adverts"
+  #options$modelTerms <- list(
+  #  list(components="Adverts")
+  #)
+  #options$plotHorizontalAxis <- "Adverts"
+  #results <- jasptools::run("Ancova", dataset = rio::import("~/Dropbox/ej_andy_shared/spss_tutorials/spss_glm_01/www/Album Sales.sav"), options, view=FALSE, quiet=TRUE)
+  #plotUnspecified1 <- results[["state"]][["stateDescriptivesPlot"]][[1]]
+  #expect_equal_plots(plotUnspecified1, "?", dir="Ancova") # This command needs to be updated
+#})
+
+
 # Chapter 6
 test_that("Fields Book - Chapter 6 results match", {
   options <- jasptools::analysisOptions("Ancova")

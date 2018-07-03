@@ -101,3 +101,37 @@ test_that("Analysis handles errors", {
   notes <- unlist(results[["results"]][["ttest"]][["footnotes"]])
   expect_true(any(grepl("observations", notes, ignore.case=TRUE)), label = "Too few obs check")
 })
+
+
+# Below are the unit tests for Andy Field's book
+
+# Chapter 1
+test_that("Fields Book - Chapter 1 results match", {
+  options <- jasptools::analysisOptions("TTestOneSample")
+  dataset <- rio::import("~/Dropbox/ej_andy_shared/spss_tutorials/spss_glm_04/www/Puppies Dummy.sav")
+  dataset1 <- dataset[dataset$Dose == 1, ]
+  dataset2 <- dataset[dataset$Dose == 2, ]
+  dataset3 <- dataset[dataset$Dose == 3, ]
+  options$variables <- "Happiness"
+  options$testValue <- 0
+  options$meanDiffConfidenceIntervalCheckbox <- TRUE
+  options$meanDiffConfidenceIntervalPercent <- 0.95
+  results1 <- jasptools::run("TTestOneSample", dataset1, options, view=FALSE, quiet=TRUE)
+  results2 <- jasptools::run("TTestOneSample", dataset2, options, view=FALSE, quiet=TRUE)
+  results3 <- jasptools::run("TTestOneSample", dataset3, options, view=FALSE, quiet=TRUE)
+  resultsT <- jasptools::run("TTestOneSample", dataset, options, view=FALSE, quiet=TRUE)
+  table2b <- list(results1[["results"]][["ttest"]][["data"]][[1]]$lowerCIlocationParameter,
+                  results1[["results"]][["ttest"]][["data"]][[1]]$upperCIlocationParameter,
+                  results2[["results"]][["ttest"]][["data"]][[1]]$lowerCIlocationParameter,
+                  results2[["results"]][["ttest"]][["data"]][[1]]$upperCIlocationParameter,
+                  results3[["results"]][["ttest"]][["data"]][[1]]$lowerCIlocationParameter,
+                  results3[["results"]][["ttest"]][["data"]][[1]]$upperCIlocationParameter,
+                  resultsT[["results"]][["ttest"]][["data"]][[1]]$lowerCIlocationParameter,
+                  resultsT[["results"]][["ttest"]][["data"]][[1]]$upperCIlocationParameter)
+  expect_equal_tables(table2b,
+                      list(0.5810682, 3.818932,
+                           1.581068, 4.818932,
+                           3.036757, 6.963243,
+                           2.487896, 4.445437)
+  )
+})

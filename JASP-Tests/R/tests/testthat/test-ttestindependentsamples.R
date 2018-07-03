@@ -102,3 +102,74 @@ test_that("Analysis handles errors", {
   msg <- results[["results"]][["errorMessage"]]
   expect_true(any(grepl("levels", msg, ignore.case=TRUE)), label = "1-level factor check")
 })
+
+# Below are the unit tests for Andy Field's book
+
+# Chapter 4
+test_that("Fields Book - Chapter 4 results match", {
+  options <- jasptools::analysisOptions("TTestIndependentSamples")
+  dataset <- rio::import("~/Dropbox/ej_andy_shared/spss_tutorials/spss_glm_04/www/Puppies Dummy.sav")
+  datasetC12 <- dataset[dataset$Dose != 3, ]
+  datasetC13 <- dataset[dataset$Dose != 2, ]
+  datasetC23 <- dataset[dataset$Dose != 1, ]
+  options$variables <- "Happiness"
+  options$groupingVariable <- "Dose"
+  options$effectSize <- TRUE
+  options$effectSizeSD <- "effectSizeSDGroup1"
+  resultsPuppiesCohensD30Control <- jasptools::run("TTestIndependentSamples", datasetC13, options, view=FALSE, quiet=TRUE)
+  resultsPuppiesCohensD15Control <- jasptools::run("TTestIndependentSamples", datasetC12, options, view=FALSE, quiet=TRUE)
+  options$effectSizeSD <- "effectSizeSDPooled"
+  resultsPuppiesCohensD3015 <- jasptools::run("TTestIndependentSamples", datasetC23, options, view=FALSE, quiet=TRUE)
+  
+  resultsCohensD <- list(resultsPuppiesCohensD30Control[["results"]][["ttest.tables"]][["ttestParametric"]][["data"]][[1]][["cohensd"]],
+                         resultsPuppiesCohensD15Control[["results"]][["ttest.tables"]][["ttestParametric"]][["data"]][[1]][["cohensd"]],
+                         resultsPuppiesCohensD3015[["results"]][["ttest.tables"]][["ttestParametric"]][["data"]][[1]][["cohensd"]])
+  expect_equal_tables(tableOutput2,
+                      list(-2.147502, -0.766965, -1.242118))
+
+  options <- jasptools::analysisOptions("TTestIndependentSamples")
+  dataset <- rio::import("~/Dropbox/ej_andy_shared/spss_tutorials/spss_glm_04/www/Superhero.sav")
+  datasetC12 <- dataset[dataset$hero == 1 | dataset$hero == 2, ]
+  datasetC13 <- dataset[dataset$hero == 1 | dataset$hero == 3, ]
+  datasetC14 <- dataset[dataset$hero == 1 | dataset$hero == 4, ]
+  datasetC23 <- dataset[dataset$hero == 2 | dataset$hero == 3, ]
+  datasetC24 <- dataset[dataset$hero == 2 | dataset$hero == 4, ]
+  datasetC34 <- dataset[dataset$hero == 3 | dataset$hero == 4, ]
+  options$variables <- "injury"
+  options$groupingVariable <- "hero"
+  options$effectSize <- TRUE
+  options$effectSizeSD <- "effectSizeSDGroup2"
+  resultsHeroCohensDConSuperSpider <- jasptools::run("TTestIndependentSamples", datasetC12, options, view=FALSE, quiet=TRUE)
+  resultsHeroCohensDConSuperHulk <- jasptools::run("TTestIndependentSamples", datasetC13, options, view=FALSE, quiet=TRUE)
+  resultsHeroCohensDConSuperNinja <- jasptools::run("TTestIndependentSamples", datasetC14, options, view=FALSE, quiet=TRUE)
+  resultsHeroCohensDConSpiderHulk <- jasptools::run("TTestIndependentSamples", datasetC23, options, view=FALSE, quiet=TRUE)
+  resultsHeroCohensDConSpiderNinja <- jasptools::run("TTestIndependentSamples", datasetC24, options, view=FALSE, quiet=TRUE)
+  resultsHeroCohensDConHulkNinja <- jasptools::run("TTestIndependentSamples", datasetC34, options, view=FALSE, quiet=TRUE)
+  resultsCohensDCon <- list(resultsHeroCohensDConSuperSpider[["results"]][["ttest.tables"]][["ttestParametric"]][["data"]][[1]][["cohensd"]],
+                            resultsHeroCohensDConSuperHulk[["results"]][["ttest.tables"]][["ttestParametric"]][["data"]][[1]][["cohensd"]],
+                            resultsHeroCohensDConSuperNinja[["results"]][["ttest.tables"]][["ttestParametric"]][["data"]][[1]][["cohensd"]],
+                            resultsHeroCohensDConSpiderHulk[["results"]][["ttest.tables"]][["ttestParametric"]][["data"]][[1]][["cohensd"]],
+                            resultsHeroCohensDConSpiderNinja[["results"]][["ttest.tables"]][["ttestParametric"]][["data"]][[1]][["cohensd"]],
+                            resultsHeroCohensDConHulkNinja[["results"]][["ttest.tables"]][["ttestParametric"]][["data"]][[1]][["cohensd"]])
+  expect_equal_tables(resultsCohensDCon,
+                      list(1.532004, 1.864822, 4.179566, 0.4669839, 1.885403, 1.118979)
+  )
+  
+  options$effectSizeSD <- "effectSizeSDPooled"
+  resultsHeroCohensDPooSuperSpider <- jasptools::run("TTestIndependentSamples", datasetC12, options, view=FALSE, quiet=TRUE)
+  resultsHeroCohensDPooSuperHulk <- jasptools::run("TTestIndependentSamples", datasetC13, options, view=FALSE, quiet=TRUE)
+  resultsHeroCohensDPooSuperNinja <- jasptools::run("TTestIndependentSamples", datasetC14, options, view=FALSE, quiet=TRUE)
+  resultsHeroCohensDPooSpiderHulk <- jasptools::run("TTestIndependentSamples", datasetC23, options, view=FALSE, quiet=TRUE)
+  resultsHeroCohensDPooSpiderNinja <- jasptools::run("TTestIndependentSamples", datasetC24, options, view=FALSE, quiet=TRUE)
+  resultsHeroCohensDPooHulkNinja <- jasptools::run("TTestIndependentSamples", datasetC34, options, view=FALSE, quiet=TRUE)
+  resultsCohensDPoo <- list(resultsHeroCohensDPooSuperSpider[["results"]][["ttest.tables"]][["ttestParametric"]][["data"]][[1]][["cohensd"]],
+                            resultsHeroCohensDPooSuperHulk[["results"]][["ttest.tables"]][["ttestParametric"]][["data"]][[1]][["cohensd"]],
+                            resultsHeroCohensDPooSuperNinja[["results"]][["ttest.tables"]][["ttestParametric"]][["data"]][[1]][["cohensd"]],
+                            resultsHeroCohensDPooSpiderHulk[["results"]][["ttest.tables"]][["ttestParametric"]][["data"]][[1]][["cohensd"]],
+                            resultsHeroCohensDPooSpiderNinja[["results"]][["ttest.tables"]][["ttestParametric"]][["data"]][[1]][["cohensd"]],
+                            resultsHeroCohensDPooHulkNinja[["results"]][["ttest.tables"]][["ttestParametric"]][["data"]][[1]][["cohensd"]])
+  expect_equal_tables(resultsCohensDPoo,
+                      list(1.261983, 1.620304, 2.602089, 0.4878571, 1.480746, 0.8234014)
+  )                    
+})
+  
