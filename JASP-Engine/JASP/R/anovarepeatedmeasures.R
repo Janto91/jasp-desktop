@@ -20,6 +20,9 @@ AnovaRepeatedMeasures <- function(dataset=NULL, options, perform="run", callback
 	numeric.variables <- numeric.variables[numeric.variables != ""]
 	factor.variables <- c(unlist(options$betweenSubjectFactors))
 	factor.variables <- factor.variables[factor.variables != ""]
+	
+	# This is a hack (Will be changed after moving to QML)
+	options <- .updateOptionsModelTerms(options)
 
 	if (is.null(dataset)) {
 
@@ -518,32 +521,32 @@ AnovaRepeatedMeasures <- function(dataset=NULL, options, perform="run", callback
 }
 
 .rmModelFormula <- function(options) {
-
-	termsRM.base64 <- c()
-	termsRM.normal <- c()
-
-	for (term in options$withinModelTerms) {
-
-		components <- unlist(term$components)
-		termRM.base64 <- paste(.v(components), collapse=":", sep="")
-		termRM.normal <- paste(components, collapse=" \u273B ", sep="")
-
-		termsRM.base64 <- c(termsRM.base64, termRM.base64)
-		termsRM.normal <- c(termsRM.normal, termRM.normal)
-	}
-
-	termsBS.base64 <- c()
-	termsBS.normal <- c()
-
-	for (term in options$betweenModelTerms) {
-
-		components <- unlist(term$components)
-		termBS.base64 <- paste(.v(components), collapse=":", sep="")
-		termBS.normal <- paste(components, collapse=" \u273B ", sep="")
-
-		termsBS.base64 <- c(termsBS.base64, termBS.base64)
-		termsBS.normal <- c(termsBS.normal, termBS.normal)
-	}
+  
+  termsRM.base64 <- c()
+  termsRM.normal <- c()
+  
+  for (term in options$withinModelTerms) {
+    
+    components <- unlist(term$components)
+    termRM.base64 <- paste(.v(components), collapse=":", sep="")
+    termRM.normal <- paste(components, collapse=" \u273B ", sep="")
+    
+    termsRM.base64 <- c(termsRM.base64, termRM.base64)
+    termsRM.normal <- c(termsRM.normal, termRM.normal)
+  }
+  
+  termsBS.base64 <- c()
+  termsBS.normal <- c()
+  
+  for (term in options$betweenModelTerms) {
+    
+    components <- unlist(term$components)
+    termBS.base64 <- paste(.v(components), collapse=":", sep="")
+    termBS.normal <- paste(components, collapse=" \u273B ", sep="")
+    
+    termsBS.base64 <- c(termsBS.base64, termBS.base64)
+    termsBS.normal <- c(termsBS.normal, termBS.normal)
+  }
 
 	terms.base64 <- list()
 	terms.normal <- list()
@@ -701,19 +704,19 @@ AnovaRepeatedMeasures <- function(dataset=NULL, options, perform="run", callback
 				HF <- 1
 			}
 			
-			Levels <- 1
+			df <- 1
 			LBDenominator <- 1
 			for (j in 1:length(modelTermsCase)) {
 			  for (k in 1:length(options$repeatedMeasuresFactors)) {
 			    if (modelTermsCase[[j]] == .v(options$repeatedMeasuresFactors[[k]]$name)) {
-			      Levels <- Levels*length(options$repeatedMeasuresFactors[[k]]$levels)
+			      df <- df*(choose(length(options$repeatedMeasuresFactors[[k]]$levels), 2) - 1)
 			      LBDenominator <- LBDenominator*(length(options$repeatedMeasuresFactors[[k]]$levels) - 1)
 			    }
 			  }
 			}
 			
 			epsilonTable[i,"W"] <- mauchly[index,"Test statistic"]
-			epsilonTable[i,"df"] <- choose(Levels, 2) - 1
+			epsilonTable[i,"df"] <- df
 			epsilonTable[i,"p"] <- mauchly[index,"p-value"]
 			epsilonTable[i,"Chi"] <- qchisq(1-epsilonTable[i,"p"], df=epsilonTable[i,"df"]) 
 			epsilonTable[i,"GG"] <- epsilon[index, "GG eps"]
@@ -3632,12 +3635,18 @@ AnovaRepeatedMeasures <- function(dataset=NULL, options, perform="run", callback
     termsTemp <- as.vector(terms[[i]])
     
     lvls <- list()
-
+    
     for (variable in termsTemp) {
       
-      whichFactor <- unlist(lapply(options[['repeatedMeasuresFactors']], 
+      whichRMFactor <- unlist(lapply(options[['repeatedMeasuresFactors']], 
                                    FUN = function(x){x$name == variable}))
-      lvls[[.v(variable)]] <- .v(options$repeatedMeasuresFactors[[which(whichFactor == TRUE)]]$levels)
+      if (any(whichRMFactor)) {
+        lvls[[.v(variable)]] <- .v(options$repeatedMeasuresFactors[[which(whichRMFactor == TRUE)]]$levels)
+      } else {
+        whichBSFactor <- variable %in% options[['betweenSubjectFactors']]
+        lvls[[.v(variable)]] <- .v(levels(dataset[[.v(options$betweenSubjectFactors[[which(whichBSFactor == TRUE)]])]]))
+      }
+      
     }
     
     cases <- rev(expand.grid(rev(lvls)))
@@ -3928,4 +3937,39 @@ AnovaRepeatedMeasures <- function(dataset=NULL, options, perform="run", callback
   }
   
   list(result=marginalMeans, status=status, stateMarginalMeans=stateMarginalMeans)
+}
+
+.updateOptionsModelTerms <- function(options) {
+ 
+  # This is what needs to be added to the options
+  withinModelTerms <- list()
+  betweenModelTerms <- list()
+  
+  repeatedMeasuresFactors <- c()
+  betweenSubjectsFactors <- c()
+  
+  for (factor in options$repeatedMeasuresFactors) {
+    repeatedMeasuresFactors <- c(repeatedMeasuresFactors, unlist(factor$name))
+  }
+  
+  for (factor in options$betweenSubjectFactors) {
+    betweenSubjectsFactors <- c(betweenSubjectsFactors, factor)
+  }
+    
+  for (term in options$modelTerms) {
+    
+    components <- unlist(term$components)
+
+    if (all(components %in% repeatedMeasuresFactors)) {
+      withinModelTerms <- c(withinModelTerms, list(term))
+    } else if (all(components %in% betweenSubjectsFactors)) {
+      betweenModelTerms <- c(betweenModelTerms, list(term))
+    }
+  }
+  
+  # This is what needs to be added to the options
+  options[["withinModelTerms"]] <- withinModelTerms
+  options[["betweenModelTerms"]] <- betweenModelTerms
+  
+  return(options)
 }

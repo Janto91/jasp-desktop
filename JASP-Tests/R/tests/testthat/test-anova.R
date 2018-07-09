@@ -426,6 +426,53 @@ test_that("Fields Book - Chapter 7 results match", {
     list(components=c("FaceType", "Alcohol"))
   )
   options$contrasts <- list(list(contrast = "none", variable = "FaceType"), list(contrast = "Helmert", variable = "Alcohol"))
+  results <- jasptools::run("Anova", dataset = rio::import("~/Dropbox/ej_andy_shared/spss_tutorials/spss_glm_07/www/Goggles.sav"), options, view=FALSE, quiet=TRUE)
+  output1 <- results[["results"]][["anova"]][["data"]]
+  expect_equal_tables(output1,
+                      list("FaceType", 21.33333, 1, 21.33333, 15.58261, 0.0002952236, "TRUE",
+                           "Alcohol", 16.54167, 2, 8.270833, 6.041304, 0.004943389, "FALSE",
+                           "FaceType <unicode> Alcohol", 23.29167, 2, 11.64583, 8.506522, 0.0007912739, "FALSE",
+                           "Residual", 57.5, 42, 1.369048, "", "", "TRUE")
+  )
+  options <- jasptools::analysisOptions("Anova")
+  options$dependent <- "Attractiveness"
+  options$fixedFactors <- c("FaceType", "Alcohol")
+  options$modelTerms <- list(
+    list(components="FaceType"),
+    list(components="Alcohol"),
+    list(components=c("FaceType", "Alcohol"))
+  )
+  options$contrasts <- list(list(contrast = "none", variable = "FaceType"), list(contrast = "Helmert", variable = "Alcohol"))
+  options$plotHorizontalAxis <- "FaceType"
+  options$plotErrorBars <- TRUE
+  results <- jasptools::run("Anova", dataset = rio::import("~/Dropbox/ej_andy_shared/spss_tutorials/spss_glm_07/www/Goggles.sav"), options, view=FALSE, quiet=TRUE)
+  unnumberedFigure1 <- results[["state"]][["stateDescriptivesPlot"]][[1]]
+  #expect_equal_plots(unnumberedFigure1, "?", dir="Ancova") # This command needs to be updated
+  
+  options <- jasptools::analysisOptions("Anova")
+  options$dependent <- "Attractiveness"
+  options$fixedFactors <- c("FaceType", "Alcohol")
+  options$modelTerms <- list(
+    list(components="FaceType"),
+    list(components="Alcohol"),
+    list(components=c("FaceType", "Alcohol"))
+  )
+  options$contrasts <- list(list(contrast = "none", variable = "FaceType"), list(contrast = "Helmert", variable = "Alcohol"))
+  options$plotHorizontalAxis <- "Alcohol"
+  options$plotErrorBars <- TRUE
+  results <- jasptools::run("Anova", dataset = rio::import("~/Dropbox/ej_andy_shared/spss_tutorials/spss_glm_07/www/Goggles.sav"), options, view=FALSE, quiet=TRUE)
+  unnumberedFigure2 <- results[["state"]][["stateDescriptivesPlot"]][[1]]
+  #expect_equal_plots(unnumberedFigure2, "?", dir="Ancova") # This command needs to be updated
+  
+  options <- jasptools::analysisOptions("Anova")
+  options$dependent <- "Attractiveness"
+  options$fixedFactors <- c("FaceType", "Alcohol")
+  options$modelTerms <- list(
+    list(components="FaceType"),
+    list(components="Alcohol"),
+    list(components=c("FaceType", "Alcohol"))
+  )
+  options$contrasts <- list(list(contrast = "none", variable = "FaceType"), list(contrast = "Helmert", variable = "Alcohol"))
   options$postHocTestsVariables <- c("Alcohol")
   options$kruskalVariablesAssigned <- c("Alcohol")
   options$postHocTestsBonferroni <- TRUE
@@ -434,26 +481,19 @@ test_that("Fields Book - Chapter 7 results match", {
   options$postHocTestBootstrappingReplicates <- 1000
   set.seed(1)
   results <- jasptools::run("Anova", dataset = rio::import("~/Dropbox/ej_andy_shared/spss_tutorials/spss_glm_07/www/Goggles.sav"), options, view=FALSE, quiet=TRUE)
-  tableOutput1 <- results[["results"]][["anova"]][["data"]]
-  expect_equal_tables(tableOutput1,
-                      list("FaceType", 21.33333, 1, 21.33333, 15.58261, 0.0002952236, "TRUE",
-                           "Alcohol", 16.54167, 2, 8.270833, 6.041304, 0.004943389, "FALSE",
-                           "FaceType <unicode> Alcohol", 23.29167, 2, 11.64583, 8.506522, 0.0007912739, "FALSE",
-                           "Residual", 57.5, 42, 1.369048, "", "", "TRUE")
-  )
-  tableOutput2 <- results[["results"]][["contrasts"]][["collection"]][[1]][["data"]]
-  expect_equal_tables(tableOutput2,
+  output2 <- results[["results"]][["contrasts"]][["collection"]][[1]][["data"]]
+  expect_equal_tables(output2,
                       list("0 - 1, 2", -1.09375, 0.3582572, -3.052974, 0.003921402, "TRUE",
                            "1 - 2", -0.6875, 0.4136798, -1.661914, 0.1039773, "FALSE")
   )
-  tableOutput3a <- results[["results"]][["posthoc"]][["collection"]][[1]][["data"]]
-  expect_equal_tables(tableOutput3a,
+  output3a <- results[["results"]][["posthoc"]][["collection"]][[1]][["data"]]
+  expect_equal_tables(output3a,
                       list(0, 1, -0.75, 0.4136798, -1.812997, "", "", "", 0.2309501, "", "", "TRUE",
                            0, 2, -1.4375, 0.4136798, -3.47491, "", "", "", 0.003599568, "", "", "FALSE",
                            1, 2, -0.6875, 0.4136798, -1.661914, "", "", "", 0.3119319, "", "", "FALSE")
   )
-  tableOutput3b <- results[["results"]][["posthocBoots"]][["collection"]][[1]][["data"]]
-  expect_equal_tables(tableOutput3b,
+  output3b <- results[["results"]][["posthocBoots"]][["collection"]][[1]][["data"]]
+  expect_equal_tables(output3b,
                       list(0, 1, -0.75, 0.009656129, 0.4194893, -1.646094, 0.03172597, "TRUE",
                            0, 2, -1.4375, 0.01227821, 0.4321352, -2.284006, -0.648591, "FALSE",
                            1, 2, -0.6875, 0.00262208, 0.3934077, -1.457499, 0.08496317, "FALSE")
@@ -472,9 +512,14 @@ test_that("Fields Book - Chapter 7 results match", {
   options$marginalMeansBootstrapping <- TRUE
   options$marginalMeansBootstrappingReplicates <- 1000
   set.seed(1) # For Bootstrapping Unit Tests
+  options$plotHorizontalAxis <- "Alcohol"
+  options$plotSeparateLines <- "FaceType"
+  options$plotErrorBars <- TRUE
   results <- jasptools::run("Anova", dataset = rio::import("~/Dropbox/ej_andy_shared/spss_tutorials/spss_glm_07/www/Goggles.sav"), options, view=FALSE, quiet=TRUE)
-  tableOutput4a <- results[["results"]][["marginalMeans"]][["collection"]][[1]][["data"]]
-  expect_equal_tables(tableOutput4a,
+  unnumberedFigure3 <- results[["state"]][["stateDescriptivesPlot"]][[1]]
+  #expect_equal_plots(unnumberedFigure3, "?", dir="Ancova") # This command needs to be updated
+  output4a <- results[["results"]][["marginalMeans"]][["collection"]][[1]][["data"]]
+  expect_equal_tables(output4a,
                       list(0, 0, 3.5, 0.4136798, 2.66516, 4.33484, "TRUE",
                            0, 1, 4.875, 0.4136798, 4.04016, 5.70984, "FALSE",
                            0, 2, 6.625, 0.4136798, 5.79016, 7.45984, "FALSE",
@@ -482,8 +527,8 @@ test_that("Fields Book - Chapter 7 results match", {
                            1, 1, 6.5, 0.4136798, 5.66516, 7.33484, "FALSE",
                            1, 2, 6.125, 0.4136798, 5.29016, 6.95984, "FALSE")
   )
-  tableOutput4b <- results[["results"]][["marginalMeans"]][["collection"]][[2]][["data"]]
-  expect_equal_tables(tableOutput4b,
+  output4b <- results[["results"]][["marginalMeans"]][["collection"]][[2]][["data"]]
+  expect_equal_tables(output4b,
                       list(0, 0, 3.5, 0.006070666, 0.5640803, 2.33385, 4.62333, "TRUE",
                            0, 1, 4.875, -0.01314135, 0.4322475, 4.142857, 5.847589, "FALSE",
                            0, 2, 6.625, -0.01705802, 0.3793216, 6, 7.5, "FALSE",

@@ -38,7 +38,7 @@
 			"type": "Variables"
 		},
 		{
-			"name": "withinModelTerms",
+            "name": "modelTerms",
 			"type": "Table",
 			"template": [
 				{
@@ -49,16 +49,6 @@
 			"default": [
 				{
 					"components": [ "RM Factor 1" ]
-				}
-			]
-		},
-		{
-			"name": "betweenModelTerms",
-			"type": "Table",
-			"template": [
-				{
-					"name": "components",
-					"type": "Term"
 				}
 			]
 		},
