@@ -14,15 +14,15 @@
 		},
 		{
 			"default": false,
-			"name": "kendallsTauB",
-			"type": "Boolean"
-		},
-		{
-			"default": false,
 			"name": "spearman",
 			"type": "Boolean"
 		},
-		{
+        {
+            "default": false,
+            "name": "kendallsTauB",
+            "type": "Boolean"
+        },
+        {
 			"name": "hypothesis",
 			"options": [ "correlated", "correlatedPositively", "correlatedNegatively" ],
 			"default": "correlated",
